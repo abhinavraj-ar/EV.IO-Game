@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ev.io Clone Prototype</title>
+    <link rel="stylesheet" href="./src/style.css">
+  </head>
+  <body>
+    <!-- Death Screen Overlay -->
+    <div id="death-screen">
+      <h1>YOU DIED</h1>
+      <button id="respawn-btn">Respawn</button>
+    </div>
+
+    <!-- Game HUD -->
+    <div id="crosshair"></div>
+    <div id="health-container">
+      <div id="health-fill"></div>
+    </div>
+    
+    <!-- Game Canvas -->
+    <canvas id="renderCanvas"></canvas>
+    
+    <!-- TypeScript Game Logic -->
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
