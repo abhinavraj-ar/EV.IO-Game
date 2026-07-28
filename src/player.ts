@@ -2,7 +2,7 @@ import { Scene, UniversalCamera, Vector3, MeshBuilder, StandardMaterial, Color3 
 
 export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     //Setup Camera & Spawn Point
-    const spawnPoint = new Vector3(0, 10, 0); 
+    const spawnPoint = new Vector3(0, 2, 0); // just above ground
     const camera = new UniversalCamera("playerCamera", spawnPoint.clone(), scene);
     camera.setTarget(new Vector3(0, 0, 10)); 
     camera.attachControl(canvas, true);
@@ -14,16 +14,15 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     camera.keysRight.push(68); // D
     camera.speed = 0.4;
     camera.angularSensibility = 2500;
-    
-    camera.applyGravity = true; 
+
+    // applyGravity=true lets BabylonJS handle floor collision via scene.gravity.
+    // We intercept the cameraDirection each frame to add our own jump arc on top.
+    camera.applyGravity = true;
     camera.checkCollisions = true;
-    
+
     //Create a tall, thin collision bubble
     camera.ellipsoid = new Vector3(0.5, 1, 0.5);
     camera.ellipsoidOffset = new Vector3(0, 1, 0);
-    
-    // The Gravity Fix
-    (camera as any)._needMoveForGravity = false; 
 
     //The Gun Model
     const gun = MeshBuilder.CreateBox("gun", { width: 0.2, height: 0.2, depth: 1 }, scene);
@@ -79,38 +78,68 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
             currentHealth = maxHealth;
             updateHealthUI();
             
-            // Teleport back to spawn
+            // Teleport back to spawn and reset vertical physics
             camera.position = spawnPoint.clone();
             camera.cameraDirection = new Vector3(0, 0, 0);
-            
+            canJump = true;
+            hasPeaked = false;
+
             isDead = false;
         });
     }
 
-    // 5. Jump & Falling Logic
-    let isJumping = false;
-    
+    // Jump & Landing Detection
+    //
+    // How it works:
+    //   1. On Space, we do ONE single set: camera.cameraDirection.y = JUMP_FORCE.
+    //      BabylonJS inertia + scene.gravity naturally arcs the player up then back down.
+    //      We never touch cameraDirection.y again until the next jump.
+    //
+    //   2. Landing uses a two-phase check so the apex (deltaY ≈ 0) can't fool it:
+    //      Phase A — hasPeaked: wait until the player is genuinely falling (deltaY < -0.02).
+    //      Phase B — once hasPeaked, landing is when the fall stops (deltaY >= -0.005).
+    //      Only after both phases do we set canJump = true again.
+
+    const JUMP_FORCE = 2; // single upward impulse injected into cameraDirection.y
+    let canJump  = true;     // whether the player is allowed to jump
+    let hasPeaked = false;   // true once the player has visibly started falling
+    let prevY = spawnPoint.y;
+
     scene.onBeforeRenderObservable.add(() => {
-        if (isDead) return; // Freeze game logic while dead
-        
-        if (camera.position.y <= 1.1) {
-            isJumping = false;
+        if (isDead) return;
+
+        const currentY = camera.position.y;
+        const deltaY   = currentY - prevY;
+        prevY = currentY;
+
+        if (!canJump) {
+            // Phase A: detect the falling portion of the arc
+            if (!hasPeaked && deltaY < -0.02) {
+                hasPeaked = true;
+            }
+            // Phase B: once genuinely falling, detect landing (fall stops)
+            if (hasPeaked && deltaY >= -0.005) {
+                canJump   = true;
+                hasPeaked = false;
+            }
         }
-        
-        // Falling off the map
+
+        // Fell off the map
         if (camera.position.y < -10) {
-            takeDamage(100); 
+            takeDamage(100);
         }
     });
 
     window.addEventListener("keydown", (e) => {
-        if (isDead) return; // Prevent jumping/testing damage while dead
+        if (isDead) return;
 
-        if (e.code === "Space" && !isJumping) {
-            isJumping = true;
-            camera.cameraDirection.y += 2; 
+        if (e.code === "Space" && canJump) {
+            canJump   = false;
+            hasPeaked = false;
+            // Single impulse — BabylonJS gravity + inertia handles the rest
+            camera.cameraDirection.y = JUMP_FORCE;
         }
-        
+
         // Press 'H' to test damage
         if (e.code === "KeyH") {
             takeDamage(15);
