@@ -45,10 +45,20 @@ interface RemotePlayer {
 // ─────────────────────────────────────────────
 // Module state
 // ─────────────────────────────────────────────
-// In development this is "http://localhost:3001".
-// In production (Railway) set VITE_SERVER_URL in your Vite/hosting env vars
-// to your Railway server URL e.g. "https://ev-io-server.up.railway.app"
-const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? "http://localhost:3001";
+// In development this falls back to localhost:3001.
+// In production set the VITE_SERVER_URL GitHub Secret to your Railway HTTPS URL
+// e.g.  https://your-app.up.railway.app
+const _rawUrl   = import.meta.env.VITE_SERVER_URL as string | undefined;
+const SERVER_URL = (_rawUrl && _rawUrl.length > 0) ? _rawUrl : "http://localhost:3001";
+
+if (!_rawUrl || _rawUrl.length === 0) {
+    console.warn(
+        "[NET] ⚠️  VITE_SERVER_URL is not set!\n" +
+        "    Multiplayer will only work on localhost.\n" +
+        "    Add VITE_SERVER_URL as a GitHub Secret pointing to your Railway server.",
+    );
+}
+
 const MOVE_SEND_RATE_MS = 50;  // Send position ~20 times/sec
 
 let socket: Socket;
