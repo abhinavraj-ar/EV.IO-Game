@@ -2,6 +2,7 @@ import { Engine, Scene, Vector3, HavokPlugin } from "@babylonjs/core";
 import HavokPhysics from "@babylonjs/havok"; // Import Havok
 import { createEnvironment } from "./environment";
 import { setupPlayer } from "./player";
+import { initNetwork } from "./network";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
 const engine = new Engine(canvas, true);
@@ -19,6 +20,9 @@ const createScene = async () => {
 
     createEnvironment(scene);
     setupPlayer(scene, canvas);
+
+    // Boot multiplayer networking — must be after setupPlayer so callbacks are registered
+    initNetwork(scene);
 
     return scene;
 };

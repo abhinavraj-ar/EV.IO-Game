@@ -1,4 +1,18 @@
 import { Scene, UniversalCamera, Vector3, MeshBuilder, StandardMaterial, Color3 } from "@babylonjs/core";
+import {
+    sendMove,
+    sendShoot,
+    sendHit,
+    sendRespawn,
+    onDamaged,
+    onDied,
+    onRespawned,
+    getRemotePlayerIdFromMesh,
+} from "./network";
+
+// Expose the camera so network.ts can read position if needed
+let _camera: UniversalCamera;
+export function getCamera(): UniversalCamera { return _camera; }
 
 export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     //Setup Camera & Spawn Point
@@ -6,6 +20,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     const camera = new UniversalCamera("playerCamera", spawnPoint.clone(), scene);
     camera.setTarget(new Vector3(0, 0, 10)); 
     camera.attachControl(canvas, true);
+    _camera = camera;
     
     //Physics & Controls Setup
     camera.keysUp.push(87);    // W
@@ -38,9 +53,10 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     let currentHealth = maxHealth;
     let isDead = false; // Tracks if the player is currently waiting to respawn
 
-    const healthFill = document.getElementById("health-fill") as HTMLDivElement;
+    const healthFill  = document.getElementById("health-fill")  as HTMLDivElement;
     const deathScreen = document.getElementById("death-screen") as HTMLDivElement;
-    const respawnBtn = document.getElementById("respawn-btn") as HTMLButtonElement;
+    const respawnBtn  = document.getElementById("respawn-btn")  as HTMLButtonElement;
+    const killFeed    = document.getElementById("kill-feed")    as HTMLDivElement;
 
     function updateHealthUI() {
         if (healthFill) {
@@ -49,42 +65,73 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
         }
     }
 
-    function takeDamage(amount: number) {
-        if (isDead) return; // Prevent taking damage while already dead
+    // ── Called by network.ts when the server says we took damage ──────────────
+    onDamaged((health: number, _attackerId: string) => {
+        if (isDead) return;
+        currentHealth = health;
 
-        currentHealth -= amount;
-        
         if (currentHealth <= 0) {
             currentHealth = 0;
             isDead = true;
-            
-            // 1. Show the death screen
             if (deathScreen) deathScreen.style.display = "flex";
-            
-            // 2. Unlock the mouse so the player can click the button
             document.exitPointerLock = document.exitPointerLock || (document as any).webkitExitPointerLock;
             if (document.exitPointerLock) document.exitPointerLock();
         }
         updateHealthUI();
+    });
+
+    // ── Called by network.ts when the server confirms our death ───────────────
+    onDied((_killerId: string) => {
+        isDead = true;
+        currentHealth = 0;
+        updateHealthUI();
+        if (deathScreen) deathScreen.style.display = "flex";
+        document.exitPointerLock = document.exitPointerLock || (document as any).webkitExitPointerLock;
+        if (document.exitPointerLock) document.exitPointerLock();
+    });
+
+    // ── Called by network.ts when the server respawns us ─────────────────────
+    onRespawned((x: number, y: number, z: number) => {
+        currentHealth = maxHealth;
+        updateHealthUI();
+        isDead = false;
+        if (deathScreen) deathScreen.style.display = "none";
+        camera.position = new Vector3(x, y, z);
+        camera.cameraDirection = new Vector3(0, 0, 0);
+        canJump   = true;
+        hasPeaked = false;
+    });
+
+    // Local damage (e.g. fall damage) — also tells the server via player:hit
+    function takeDamageLocal(amount: number) {
+        if (isDead) return;
+        currentHealth -= amount;
+        if (currentHealth < 0) currentHealth = 0;
+        updateHealthUI();
+
+        if (currentHealth <= 0) {
+            isDead = true;
+            if (deathScreen) deathScreen.style.display = "flex";
+            document.exitPointerLock = document.exitPointerLock || (document as any).webkitExitPointerLock;
+            if (document.exitPointerLock) document.exitPointerLock();
+        }
     }
 
     //Respawn Button Logic
     if (respawnBtn) {
         respawnBtn.addEventListener("click", () => {
-            // Hide the death screen
+            // Tell the server to respawn us — it will reply with player:respawned
+            sendRespawn();
+
+            // Also handle local fallback (in case server is unreachable)
             deathScreen.style.display = "none";
-            
-            // Reset health
             currentHealth = maxHealth;
             updateHealthUI();
-            
-            // Teleport back to spawn and reset vertical physics
             camera.position = spawnPoint.clone();
             camera.cameraDirection = new Vector3(0, 0, 0);
-            canJump = true;
+            canJump   = true;
             hasPeaked = false;
-
-            isDead = false;
+            isDead    = false;
         });
     }
 
@@ -101,8 +148,8 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     //      Only after both phases do we set canJump = true again.
 
     const JUMP_FORCE = 2; // single upward impulse injected into cameraDirection.y
-    let canJump  = true;     // whether the player is allowed to jump
-    let hasPeaked = false;   // true once the player has visibly started falling
+    let canJump   = true;     // whether the player is allowed to jump
+    let hasPeaked = false;    // true once the player has visibly started falling
     let prevY = spawnPoint.y;
 
     scene.onBeforeRenderObservable.add(() => {
@@ -126,8 +173,16 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
 
         // Fell off the map
         if (camera.position.y < -10) {
-            takeDamage(100);
+            takeDamageLocal(100);
         }
+
+        // ── Send position to server every frame (network.ts throttles to 20Hz) ──
+        sendMove(
+            camera.position.x,
+            camera.position.y,
+            camera.position.z,
+            camera.rotation.y,
+        );
     });
 
     window.addEventListener("keydown", (e) => {
@@ -140,9 +195,9 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
             camera.cameraDirection.y = JUMP_FORCE;
         }
 
-        // Press 'H' to test damage
+        // Press 'H' to test local damage
         if (e.code === "KeyH") {
-            takeDamage(15);
+            takeDamageLocal(15);
         }
     });
 
@@ -168,9 +223,22 @@ function shoot(scene: Scene, canvas: HTMLCanvasElement) {
     const pickInfo = scene.pick(canvas.width / 2, canvas.height / 2);
 
     if (pickInfo.hit && pickInfo.pickedMesh) {
-        console.log("Hit: " + pickInfo.pickedMesh.name);
-        
-        if (pickInfo.pickedMesh.name.startsWith("crate") && pickInfo.pickedMesh.material) {
+        const meshName = pickInfo.pickedMesh.name;
+        console.log("Hit: " + meshName);
+
+        // ── Hit a remote player ───────────────────────────────────────────────
+        const remoteId = getRemotePlayerIdFromMesh(meshName);
+        if (remoteId) {
+            // 10 damage per shot — server validates and clamps
+            sendHit(remoteId, 10);
+            // Emit the shot direction for bullet-trail effects
+            const dir = pickInfo.ray?.direction;
+            if (dir) sendShoot(dir.x, dir.y, dir.z);
+            return;
+        }
+
+        // ── Hit a crate ───────────────────────────────────────────────────────
+        if (meshName.startsWith("crate") && pickInfo.pickedMesh.material) {
             const mat = pickInfo.pickedMesh.material as StandardMaterial;
             const originalColor = mat.diffuseColor;
             
@@ -180,5 +248,9 @@ function shoot(scene: Scene, canvas: HTMLCanvasElement) {
                 mat.diffuseColor = originalColor; 
             }, 100);
         }
+
+        // Emit shot direction regardless of what was hit
+        const dir = pickInfo.ray?.direction;
+        if (dir) sendShoot(dir.x, dir.y, dir.z);
     }
 }
