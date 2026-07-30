@@ -324,31 +324,45 @@ function despawnRemotePlayer(id: string) {
 }
 
 function drawNameLabel(tex: DynamicTexture, name: string, color?: Color3) {
-    const ctx = tex.getContext();
+    // BabylonJS returns ICanvasRenderingContext — cast to native API for full access
+    const ctx = tex.getContext() as unknown as CanvasRenderingContext2D;
     ctx.clearRect(0, 0, 256, 64);
+
+    // Rounded-rect helper (roundRect not in BabylonJS ICanvasRenderingContext types)
+    function roundedRect(x: number, y: number, w: number, h: number, r: number) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.arcTo(x + w, y,     x + w, y + r,     r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+        ctx.lineTo(x + r, y + h);
+        ctx.arcTo(x,     y + h, x,     y + h - r, r);
+        ctx.lineTo(x,     y + r);
+        ctx.arcTo(x,     y,     x + r, y,          r);
+        ctx.closePath();
+    }
 
     // Background pill
     ctx.fillStyle = "rgba(0,0,0,0.6)";
-    ctx.beginPath();
-    ctx.roundRect(4, 4, 248, 56, 12);
+    roundedRect(4, 4, 248, 56, 12);
     ctx.fill();
 
-    // Colored border that matches the player's body color
+    // Colored border matching the player's body color
     if (color) {
         const r = Math.round(color.r * 255);
         const g = Math.round(color.g * 255);
         const b = Math.round(color.b * 255);
         ctx.strokeStyle = `rgb(${r},${g},${b})`;
         ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.roundRect(4, 4, 248, 56, 12);
+        roundedRect(4, 4, 248, 56, 12);
         ctx.stroke();
     }
 
     // Name text
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 24px Arial";
-    ctx.textAlign = "center";
+    ctx.fillStyle    = "#ffffff";
+    ctx.font         = "bold 24px Arial";
+    ctx.textAlign    = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(name, 128, 32);
     tex.update();

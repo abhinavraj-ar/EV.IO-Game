@@ -56,7 +56,6 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     const healthFill  = document.getElementById("health-fill")  as HTMLDivElement;
     const deathScreen = document.getElementById("death-screen") as HTMLDivElement;
     const respawnBtn  = document.getElementById("respawn-btn")  as HTMLButtonElement;
-    const killFeed    = document.getElementById("kill-feed")    as HTMLDivElement;
 
     function updateHealthUI() {
         if (healthFill) {
