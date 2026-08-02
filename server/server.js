@@ -9,14 +9,15 @@
  *   player:respawn   (no payload)
  *
  * Events (Server → Client):
- *   init             { id, players: { [id]: PlayerState } }
- *   player:joined    { id, state: PlayerState }
- *   player:left      { id }
- *   player:moved     { id, x, y, z, rotY }
- *   player:shot      { id, dirX, dirY, dirZ }
- *   player:damaged   { id, health, attackerId }
- *   player:died      { id, killerId }
- *   player:respawned { id, x, y, z, health }
+ *   init                { id, players: { [id]: PlayerState } }
+ *   player:joined       { id, state: PlayerState }
+ *   player:left         { id }
+ *   player:moved        { id, x, y, z, rotY }
+ *   player:shot         { id, dirX, dirY, dirZ }
+ *   player:damaged      { id, health, attackerId }
+ *   player:died         { id, killerId }
+ *   player:respawned    { id, x, y, z, health }
+ *   leaderboard:update  { entries: [{ id, name, kills, deaths, points }] }
  */
 
 const express   = require("express");
@@ -58,10 +59,27 @@ const SPAWN_POSITIONS = [
 const players = new Map();
 let spawnIndex = 0;
 
+const POINTS_PER_KILL = 10;
+
 function getNextSpawn() {
     const pos = SPAWN_POSITIONS[spawnIndex % SPAWN_POSITIONS.length];
     spawnIndex++;
     return { ...pos };
+}
+
+/** Broadcast the current leaderboard to all connected clients. */
+function broadcastLeaderboard() {
+    const entries = Array.from(players.values())
+        .map(({ id, kills, deaths }) => ({
+            id,
+            name: id.slice(0, 8),
+            kills,
+            deaths,
+            points: kills * POINTS_PER_KILL,
+        }))
+        .sort((a, b) => b.points - a.points);
+
+    io.emit("leaderboard:update", { entries });
 }
 
 function createPlayerState(id) {
@@ -100,8 +118,14 @@ app.get("/", (req, res) => {
 // Kill feed / leaderboard endpoint
 app.get("/leaderboard", (req, res) => {
     const board = Array.from(players.values())
-        .map(({ id, kills, deaths }) => ({ id, kills, deaths }))
-        .sort((a, b) => b.kills - a.kills);
+        .map(({ id, kills, deaths }) => ({
+            id,
+            name: id.slice(0, 8),
+            kills,
+            deaths,
+            points: kills * POINTS_PER_KILL,
+        }))
+        .sort((a, b) => b.points - a.points);
     res.json(board);
 });
 
@@ -131,6 +155,9 @@ io.on("connection", (socket) => {
 
     // 2. Tell everyone else about the new player
     socket.broadcast.emit("player:joined", { id, state });
+
+    // 3. Send the fresh leaderboard to everyone (new player appears with 0 kills)
+    broadcastLeaderboard();
 
     // ── player:move ──────────────────────────────────────
     socket.on("player:move", (data) => {
@@ -198,13 +225,16 @@ io.on("connection", (socket) => {
             target.deaths++;
             attacker.kills++;
 
-            console.log(`[!] ${id} killed ${target.id}  | K:${attacker.kills}`);
+            console.log(`[!] ${id} killed ${target.id}  | K:${attacker.kills} (${attacker.kills * POINTS_PER_KILL}pts)`);
 
             // Notify everyone of the kill
             io.emit("player:died", {
                 id:       target.id,
                 killerId: id,
             });
+
+            // Broadcast updated leaderboard to all clients
+            broadcastLeaderboard();
 
             // Auto-respawn after 3 seconds
             setTimeout(() => {
@@ -255,6 +285,8 @@ io.on("connection", (socket) => {
         players.delete(id);
         io.emit("player:left", { id });
         console.log(`[-] Player disconnected: ${id}  reason=${reason}  (total: ${players.size})`);
+        // Refresh leaderboard now that player is gone
+        broadcastLeaderboard();
     });
 });
 

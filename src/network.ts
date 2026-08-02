@@ -34,6 +34,14 @@ interface PlayerState {
     deaths: number;
 }
 
+export interface LeaderboardEntry {
+    id:     string;
+    name:   string;
+    kills:  number;
+    deaths: number;
+    points: number;
+}
+
 interface RemotePlayer {
     state:     PlayerState;
     mesh:      Mesh;       // Body capsule
@@ -69,13 +77,15 @@ let myId:   string = "";
 const remotePlayers = new Map<string, RemotePlayer>();
 
 // Callbacks the rest of the game can subscribe to
-type OnDamagedCb  = (health: number, attackerId: string) => void;
-type OnDiedCb     = (killerId: string) => void;
-type OnRespawnedCb = (x: number, y: number, z: number) => void;
+type OnDamagedCb    = (health: number, attackerId: string) => void;
+type OnDiedCb       = (killerId: string) => void;
+type OnRespawnedCb  = (x: number, y: number, z: number) => void;
+type OnLeaderboardCb = (entries: LeaderboardEntry[]) => void;
 
-let onDamagedCb:   OnDamagedCb   | null = null;
-let onDiedCb:      OnDiedCb      | null = null;
-let onRespawnedCb: OnRespawnedCb | null = null;
+let onDamagedCb:    OnDamagedCb    | null = null;
+let onDiedCb:       OnDiedCb       | null = null;
+let onRespawnedCb:  OnRespawnedCb  | null = null;
+let onLeaderboardCb: OnLeaderboardCb | null = null;
 
 // ─────────────────────────────────────────────
 // Public API
@@ -96,6 +106,7 @@ export function initNetwork(babylonScene: Scene) {
     socket.on("player:damaged",    handlePlayerDamaged);
     socket.on("player:died",       handlePlayerDied);
     socket.on("player:respawned",  handlePlayerRespawned);
+    socket.on("leaderboard:update", handleLeaderboardUpdate);
 }
 
 /** Call this every frame (or on a timer) with the local player's current position. */
@@ -130,6 +141,9 @@ export function onDied(cb: OnDiedCb)          { onDiedCb     = cb; }
 
 /** Register a callback for when OUR player respawns (server-authoritative). */
 export function onRespawned(cb: OnRespawnedCb) { onRespawnedCb = cb; }
+
+/** Register a callback for leaderboard updates. */
+export function onLeaderboard(cb: OnLeaderboardCb) { onLeaderboardCb = cb; }
 
 /** Returns true if the mesh name encodes a remote player socket ID. */
 export function getRemotePlayerIdFromMesh(meshName: string): string | null {
@@ -207,6 +221,10 @@ function handlePlayerDied(data: { id: string; killerId: string }) {
             rp.state.isDead       = true;
         }
     }
+}
+
+function handleLeaderboardUpdate(data: { entries: LeaderboardEntry[] }) {
+    onLeaderboardCb?.(data.entries);
 }
 
 function handlePlayerRespawned(data: { id: string; x: number; y: number; z: number; health: number }) {

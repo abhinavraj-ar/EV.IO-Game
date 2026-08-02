@@ -7,7 +7,10 @@ import {
     onDamaged,
     onDied,
     onRespawned,
+    onLeaderboard,
     getRemotePlayerIdFromMesh,
+    getMyId,
+    type LeaderboardEntry,
 } from "./network";
 
 // Expose the camera so network.ts can read position if needed
@@ -56,6 +59,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     const healthFill  = document.getElementById("health-fill")  as HTMLDivElement;
     const deathScreen = document.getElementById("death-screen") as HTMLDivElement;
     const respawnBtn  = document.getElementById("respawn-btn")  as HTMLButtonElement;
+    const leaderboardEl = document.getElementById("leaderboard-list") as HTMLOListElement;
 
     function updateHealthUI() {
         if (healthFill) {
@@ -89,7 +93,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
         if (document.exitPointerLock) document.exitPointerLock();
     });
 
-    // ── Called by network.ts when the server respawns us ─────────────────────
+    // ── Called by network.ts when the server respawns us ───────────────────────
     onRespawned((x: number, y: number, z: number) => {
         currentHealth = maxHealth;
         updateHealthUI();
@@ -99,6 +103,21 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
         camera.cameraDirection = new Vector3(0, 0, 0);
         canJump   = true;
         hasPeaked = false;
+    });
+
+    // ── Called by network.ts when the leaderboard changes ───────────────────
+    onLeaderboard((entries: LeaderboardEntry[]) => {
+        if (!leaderboardEl) return;
+        leaderboardEl.innerHTML = entries.map((e, i) => {
+            const isMe = e.id === getMyId();
+            const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
+            return `<li class="lb-row${isMe ? " lb-me" : ""}">
+                <span class="lb-rank">${medal}</span>
+                <span class="lb-name">${isMe ? "YOU" : e.name}</span>
+                <span class="lb-kills">${e.kills}K</span>
+                <span class="lb-pts">${e.points}pts</span>
+            </li>`;
+        }).join("");
     });
 
     // Local damage (e.g. fall damage) — also tells the server via player:hit
