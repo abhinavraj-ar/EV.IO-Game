@@ -13,12 +13,20 @@ import {
     getLocalPlayerName,
     type LeaderboardEntry,
 } from "./network";
+import {
+    isMobileDevice,
+    setupMobileControls,
+    getMobileInput,
+    resetFrameInput,
+} from "./mobile-controls";
 
 // Expose the camera so network.ts can read position if needed
 let _camera: UniversalCamera;
 export function getCamera(): UniversalCamera { return _camera; }
 
 export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
+    const isMobile = isMobileDevice();
+
     //Setup Camera & Spawn Point
     const spawnPoint = new Vector3(0, 2, 0); // just above ground
     const camera = new UniversalCamera("playerCamera", spawnPoint.clone(), scene);
@@ -32,7 +40,8 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     camera.keysLeft.push(65);  // A
     camera.keysRight.push(68); // D
     camera.speed = 0.4;
-    camera.angularSensibility = 2500;
+    // Lower angular sensitivity on desktop; mobile look is manual
+    camera.angularSensibility = isMobile ? 9999999 : 2500; // effectively disable built-in mouse look on mobile
 
     // applyGravity=true lets BabylonJS handle floor collision via scene.gravity.
     // We intercept the cameraDirection each frame to add our own jump arc on top.
@@ -78,8 +87,10 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
             currentHealth = 0;
             isDead = true;
             if (deathScreen) deathScreen.style.display = "flex";
-            document.exitPointerLock = document.exitPointerLock || (document as any).webkitExitPointerLock;
-            if (document.exitPointerLock) document.exitPointerLock();
+            if (!isMobile) {
+                document.exitPointerLock = document.exitPointerLock || (document as any).webkitExitPointerLock;
+                if (document.exitPointerLock) document.exitPointerLock();
+            }
         }
         updateHealthUI();
     });
@@ -90,8 +101,10 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
         currentHealth = 0;
         updateHealthUI();
         if (deathScreen) deathScreen.style.display = "flex";
-        document.exitPointerLock = document.exitPointerLock || (document as any).webkitExitPointerLock;
-        if (document.exitPointerLock) document.exitPointerLock();
+        if (!isMobile) {
+            document.exitPointerLock = document.exitPointerLock || (document as any).webkitExitPointerLock;
+            if (document.exitPointerLock) document.exitPointerLock();
+        }
     });
 
     // ── Called by network.ts when the server respawns us ─────────────────────
@@ -133,8 +146,10 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
         if (currentHealth <= 0) {
             isDead = true;
             if (deathScreen) deathScreen.style.display = "flex";
-            document.exitPointerLock = document.exitPointerLock || (document as any).webkitExitPointerLock;
-            if (document.exitPointerLock) document.exitPointerLock();
+            if (!isMobile) {
+                document.exitPointerLock = document.exitPointerLock || (document as any).webkitExitPointerLock;
+                if (document.exitPointerLock) document.exitPointerLock();
+            }
         }
     }
 
@@ -173,6 +188,9 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     let hasPeaked = false;    // true once the player has visibly started falling
     let prevY = spawnPoint.y;
 
+    // ── Mobile setup ─────────────────────────────────────────────────────────
+    setupMobileControls();
+
     scene.onBeforeRenderObservable.add(() => {
         if (isDead) return;
 
@@ -197,6 +215,45 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
             takeDamageLocal(100);
         }
 
+        // ── Mobile joystick movement ──────────────────────────────────────────
+        if (isMobile) {
+            const mob = getMobileInput();
+
+            // Apply look rotation
+            if (mob.lookDX !== 0 || mob.lookDY !== 0) {
+                camera.rotation.y += mob.lookDX;
+                camera.rotation.x += mob.lookDY;
+                // Clamp vertical look
+                camera.rotation.x = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, camera.rotation.x));
+            }
+
+            // Apply joystick movement (local-space, relative to camera yaw)
+            if (mob.moveX !== 0 || mob.moveZ !== 0) {
+                const yaw = camera.rotation.y;
+                const speed = camera.speed;
+                const fwdX  = Math.sin(yaw) * mob.moveZ * speed;
+                const fwdZ  = Math.cos(yaw) * mob.moveZ * speed;
+                const strX  = Math.cos(yaw) * mob.moveX * speed;
+                const strZ  =-Math.sin(yaw) * mob.moveX * speed;
+                camera.cameraDirection.x += fwdX + strX;
+                camera.cameraDirection.z += fwdZ + strZ;
+            }
+
+            // Jump
+            if (mob.jumpPressed && canJump) {
+                canJump   = false;
+                hasPeaked = false;
+                camera.cameraDirection.y = JUMP_FORCE;
+            }
+
+            // Shoot
+            if (mob.shootPressed) {
+                shoot(scene, canvas);
+            }
+
+            resetFrameInput();
+        }
+
         // ── Send position to server every frame (network.ts throttles to 20Hz) ──
         sendMove(
             camera.position.x,
@@ -206,6 +263,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
         );
     });
 
+    // ── Desktop keyboard controls ─────────────────────────────────────────────
     window.addEventListener("keydown", (e) => {
         if (isDead) return;
 
@@ -222,19 +280,21 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
         }
     });
 
-    //Pointer Lock & Shooting
-    canvas.addEventListener("click", () => {
-        if (isDead) return; // Prevent shooting and locking mouse while dead
+    // ── Desktop Pointer Lock & Shooting ───────────────────────────────────────
+    if (!isMobile) {
+        canvas.addEventListener("click", () => {
+            if (isDead) return; // Prevent shooting and locking mouse while dead
 
-        if (document.pointerLockElement !== canvas) {
-            canvas.requestPointerLock = canvas.requestPointerLock || (canvas as any).webkitRequestPointerLock;
-            if (canvas.requestPointerLock) {
-                canvas.requestPointerLock();
+            if (document.pointerLockElement !== canvas) {
+                canvas.requestPointerLock = canvas.requestPointerLock || (canvas as any).webkitRequestPointerLock;
+                if (canvas.requestPointerLock) {
+                    canvas.requestPointerLock();
+                }
+            } else {
+                shoot(scene, canvas);
             }
-        } else {
-            shoot(scene, canvas);
-        }
-    });
+        });
+    }
 
     return camera;
 }

@@ -2,7 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Mobile: prevent zoom, fill viewport correctly -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <title>ev.io Clone Prototype</title>
     <link rel="stylesheet" href="./src/style.css">
   </head>
@@ -27,7 +31,25 @@
       </div>
       <ol id="leaderboard-list"></ol>
     </div>
-    
+
+    <!-- ══ Mobile Controls ══════════════════════════════════════════════════ -->
+
+    <!-- Left side: movement joystick zone -->
+    <div id="joy-zone">
+      <div id="joy-base">
+        <div id="joy-handle"></div>
+      </div>
+    </div>
+
+    <!-- Right side: look / aim pad (transparent, covers right half) -->
+    <div id="look-pad"></div>
+
+    <!-- Action buttons (bottom-right, above look pad) -->
+    <div id="action-buttons">
+      <button id="btn-shoot" class="action-btn shoot-btn">🔫</button>
+      <button id="btn-jump"  class="action-btn jump-btn">⬆</button>
+    </div>
+
     <!-- Game Canvas -->
     <canvas id="renderCanvas"></canvas>
     
