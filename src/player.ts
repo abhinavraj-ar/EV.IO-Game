@@ -14,6 +14,7 @@ import {
     type LeaderboardEntry,
 } from "./network";
 import {
+    _isMobile,
     isMobileDevice,
     setupMobileControls,
     getMobileInput,

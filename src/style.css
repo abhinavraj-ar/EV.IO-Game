@@ -340,67 +340,73 @@ body {
     font-size: 24px;
 }
 
-/* ── Show mobile controls on touch devices ─────────────────────────────────── */
+/* ── Show mobile controls — driven by JS adding .is-mobile to <body> ─────────
+   This is more reliable than @media (hover:none) and (pointer:coarse)
+   which some mobile browsers report incorrectly.
+   ─────────────────────────────────────────────────────────────────────────── */
+body.is-mobile #joy-zone        { display: block; }
+body.is-mobile #look-pad        { display: block; }
+body.is-mobile #action-buttons  { display: flex; }
+
+/* Shrink leaderboard on mobile */
+body.is-mobile #leaderboard {
+    width: 160px;
+    top: 10px;
+    right: 10px;
+}
+
+body.is-mobile #leaderboard-header {
+    font-size: 10px;
+    padding: 8px 10px 6px;
+}
+
+body.is-mobile .lb-row {
+    grid-template-columns: 22px 1fr 26px 42px;
+    font-size: 10px;
+    padding: 4px 8px;
+}
+
+body.is-mobile .lb-name  { font-size: 10px; }
+body.is-mobile .lb-kills { font-size: 10px; }
+body.is-mobile .lb-pts   { font-size: 10px; }
+
+/* Move health bar above joystick on mobile */
+body.is-mobile #health-container {
+    bottom: calc(50% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 18px;
+}
+
+/* Smaller death screen text on mobile */
+body.is-mobile #death-screen h1 {
+    font-size: 40px;
+}
+
+/* Extra small phones (landscape) */
+body.is-mobile.landscape-small #joy-base {
+    bottom: 30px;
+    left: 30px;
+    width: 85px;
+    height: 85px;
+}
+
+body.is-mobile.landscape-small .action-btn {
+    width: 54px;
+    height: 54px;
+    font-size: 22px;
+}
+
+body.is-mobile.landscape-small #action-buttons {
+    bottom: 20px;
+    right: 16px;
+    gap: 10px;
+}
+
+/* Also keep media query as a fallback for cases where JS is slow */
 @media (hover: none) and (pointer: coarse) {
     #joy-zone        { display: block; }
     #look-pad        { display: block; }
     #action-buttons  { display: flex; }
-
-    /* Shrink leaderboard on small screens */
-    #leaderboard {
-        width: 160px;
-        top: 10px;
-        right: 10px;
-    }
-
-    #leaderboard-header {
-        font-size: 10px;
-        padding: 8px 10px 6px;
-    }
-
-    .lb-row {
-        grid-template-columns: 22px 1fr 26px 42px;
-        font-size: 10px;
-        padding: 4px 8px;
-    }
-
-    .lb-name { font-size: 10px; }
-    .lb-kills { font-size: 10px; }
-    .lb-pts   { font-size: 10px; }
-
-    /* Move health bar above joystick on mobile */
-    #health-container {
-        bottom: calc(50% + 10px);
-        left: 50%;
-        transform: translateX(-50%);
-        width: 60%;
-        height: 18px;
-    }
-
-    /* Smaller death screen text on mobile */
-    #death-screen h1 {
-        font-size: 40px;
-    }
-}
-
-/* Extra small phones (landscape) */
-@media (hover: none) and (pointer: coarse) and (max-height: 420px) {
-    #joy-base {
-        bottom: 30px;
-        left: 30px;
-        width: 85px;
-        height: 85px;
-    }
-
-    .action-btn {
-        width: 54px;
-        height: 54px;
-        font-size: 22px;
-    }
-
-    #action-buttons {
-        bottom: 20px;
-        right: 16px;
-        gap: 10px;
-    }
 }

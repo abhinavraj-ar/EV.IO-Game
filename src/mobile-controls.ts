@@ -26,13 +26,37 @@ const state: MobileInput = {
     shootPressed: false,
 };
 
-// Detect touch device
+// ── Mobile detection — runs synchronously at module load time ─────────────────
+// We use multiple signals so no single browser quirk can fool us.
+function detectMobile(): boolean {
+    // 1. Touch points available
+    if (navigator.maxTouchPoints > 0) return true;
+    // 2. Classic ontouchstart
+    if ('ontouchstart' in window) return true;
+    // 3. User-agent keywords (covers most mobile browsers)
+    if (/Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(navigator.userAgent)) return true;
+    // 4. CSS pointer media (coarse = finger, not mouse)
+    if (window.matchMedia('(pointer: coarse)').matches) return true;
+    return false;
+}
+
+export const _isMobile = detectMobile();
+
+// ── Apply .is-mobile class IMMEDIATELY so CSS shows controls right away ───────
+// This runs synchronously when the module is first imported (before any await).
+if (_isMobile) {
+    document.documentElement.classList.add('is-mobile'); // <html>
+    document.body?.classList.add('is-mobile');           // <body> if available
+    // Also apply once DOM is ready (in case body isn't available yet)
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            document.body.classList.add('is-mobile');
+        });
+    }
+}
+
 export function isMobileDevice(): boolean {
-    return (
-        'ontouchstart' in window ||
-        navigator.maxTouchPoints > 0 ||
-        window.matchMedia('(hover: none) and (pointer: coarse)').matches
-    );
+    return _isMobile;
 }
 
 export function getMobileInput(): MobileInput {
@@ -46,10 +70,22 @@ export function resetFrameInput() {
     state.shootPressed = false;
 }
 
-export function setupMobileControls() {
-    if (!isMobileDevice()) return;
+// Update landscape-small class on resize
+function updateLandscapeClass() {
+    const isSmall = window.innerHeight < 420;
+    document.body.classList.toggle('landscape-small', isSmall);
+}
 
-    // Hide the desktop crosshair, show mobile HUD
+export function setupMobileControls() {
+    if (!_isMobile) return;
+
+    // Ensure class is set (belt-and-suspenders in case body wasn't ready at import time)
+    document.body.classList.add('is-mobile');
+    updateLandscapeClass();
+    window.addEventListener('resize', updateLandscapeClass);
+    window.addEventListener('orientationchange', () => setTimeout(updateLandscapeClass, 150));
+
+    // Larger crosshair on mobile
     const crosshair = document.getElementById('crosshair');
     if (crosshair) crosshair.classList.add('mobile-crosshair');
 
@@ -57,6 +93,11 @@ export function setupMobileControls() {
     const joyZone   = document.getElementById('joy-zone')   as HTMLDivElement;
     const joyBase   = document.getElementById('joy-base')   as HTMLDivElement;
     const joyHandle = document.getElementById('joy-handle') as HTMLDivElement;
+
+    if (!joyZone || !joyBase || !joyHandle) {
+        console.warn('[mobile] Joystick elements not found in DOM');
+        return;
+    }
 
     let joyTouchId: number | null = null;
     let joyOriginX = 0;
@@ -88,7 +129,7 @@ export function setupMobileControls() {
             }
             joyHandle.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
             state.moveX =  dx / JOY_RADIUS;
-            state.moveZ = -dy / JOY_RADIUS;  // negative because forward is -Z
+            state.moveZ = -dy / JOY_RADIUS;  // negative because forward is -Z in BabylonJS
         }
     }, { passive: false });
 
@@ -144,15 +185,19 @@ export function setupMobileControls() {
 
     // ── Jump button ───────────────────────────────────────────────────────────
     const jumpBtn = document.getElementById('btn-jump') as HTMLButtonElement;
-    jumpBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        state.jumpPressed = true;
-    }, { passive: false });
+    if (jumpBtn) {
+        jumpBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            state.jumpPressed = true;
+        }, { passive: false });
+    }
 
     // ── Shoot button ──────────────────────────────────────────────────────────
     const shootBtn = document.getElementById('btn-shoot') as HTMLButtonElement;
-    shootBtn.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        state.shootPressed = true;
-    }, { passive: false });
+    if (shootBtn) {
+        shootBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            state.shootPressed = true;
+        }, { passive: false });
+    }
 }
