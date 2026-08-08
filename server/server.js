@@ -48,6 +48,7 @@ const SPAWN_POSITIONS = [
 /**
  * @type {Map<string, {
  *   id: string,
+ *   name: string,
  *   x: number, y: number, z: number,
  *   rotY: number,
  *   health: number,
@@ -70,9 +71,9 @@ function getNextSpawn() {
 /** Broadcast the current leaderboard to all connected clients. */
 function broadcastLeaderboard() {
     const entries = Array.from(players.values())
-        .map(({ id, kills, deaths }) => ({
+        .map(({ id, name, kills, deaths }) => ({
             id,
-            name: id.slice(0, 8),
+            name,
             kills,
             deaths,
             points: kills * POINTS_PER_KILL,
@@ -82,10 +83,11 @@ function broadcastLeaderboard() {
     io.emit("leaderboard:update", { entries });
 }
 
-function createPlayerState(id) {
+function createPlayerState(id, name) {
     const spawn = getNextSpawn();
     return {
         id,
+        name,
         x:      spawn.x,
         y:      spawn.y,
         z:      spawn.z,
@@ -118,9 +120,9 @@ app.get("/", (req, res) => {
 // Kill feed / leaderboard endpoint
 app.get("/leaderboard", (req, res) => {
     const board = Array.from(players.values())
-        .map(({ id, kills, deaths }) => ({
+        .map(({ id, name, kills, deaths }) => ({
             id,
-            name: id.slice(0, 8),
+            name,
             kills,
             deaths,
             points: kills * POINTS_PER_KILL,
@@ -143,8 +145,13 @@ io.on("connection", (socket) => {
     const id = socket.id;
     console.log(`[+] Player connected: ${id}  (total: ${players.size + 1})`);
 
+    // Read and sanitize the display name sent in the socket.io auth handshake
+    const rawName  = socket.handshake.auth?.name ?? "";
+    const safeName = String(rawName).replace(/[<>&"']/g, "").trim().slice(0, 18);
+    const name     = safeName || `Player${Math.floor(Math.random() * 9999)}`;
+
     // Build state for new player
-    const state = createPlayerState(id);
+    const state = createPlayerState(id, name);
     players.set(id, state);
 
     // 1. Send the new player their own ID + snapshot of all current players

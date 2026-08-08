@@ -24,6 +24,7 @@ import {
 // ─────────────────────────────────────────────
 interface PlayerState {
     id:     string;
+    name:   string; // Display name chosen by the client
     x:      number;
     y:      number;
     z:      number;
@@ -69,6 +70,31 @@ if (!_rawUrl || _rawUrl.length === 0) {
 
 const MOVE_SEND_RATE_MS = 50;  // Send position ~20 times/sec
 
+// ─────────────────────────────────────────────
+// Player Name — persisted in localStorage
+// ─────────────────────────────────────────────
+const ADJECTIVES = ["Swift","Bold","Rogue","Shadow","Storm","Iron","Neon","Dark","Cyber","Ghost",
+                    "Ultra","Steel","Blaze","Void","Hyper","Toxic","Nova","Ace","Grim","Apex"];
+const NOUNS      = ["Wolf","Hawk","Fox","Blade","Viper","Knight","Sniper","Reaper","Hunter","Ghost",
+                    "Ranger","Titan","Wraith","Phantom","Raven","Bullet","Cobra","Eagle","Shark","Bear"];
+
+function generateRandomName(): string {
+    const adj  = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+    const noun  = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+    const num   = Math.floor(Math.random() * 99) + 1;
+    return `${adj}${noun}${num}`;
+}
+
+/** Returns this player's display name, creating and persisting one if needed. */
+export function getLocalPlayerName(): string {
+    let name = localStorage.getItem("ev_player_name");
+    if (!name || name.trim() === "") {
+        name = generateRandomName();
+        localStorage.setItem("ev_player_name", name);
+    }
+    return name;
+}
+
 let socket: Socket;
 let scene:  Scene;
 let myId:   string = "";
@@ -77,14 +103,14 @@ let myId:   string = "";
 const remotePlayers = new Map<string, RemotePlayer>();
 
 // Callbacks the rest of the game can subscribe to
-type OnDamagedCb    = (health: number, attackerId: string) => void;
-type OnDiedCb       = (killerId: string) => void;
-type OnRespawnedCb  = (x: number, y: number, z: number) => void;
+type OnDamagedCb     = (health: number, attackerId: string) => void;
+type OnDiedCb        = (killerId: string) => void;
+type OnRespawnedCb   = (x: number, y: number, z: number) => void;
 type OnLeaderboardCb = (entries: LeaderboardEntry[]) => void;
 
-let onDamagedCb:    OnDamagedCb    | null = null;
-let onDiedCb:       OnDiedCb       | null = null;
-let onRespawnedCb:  OnRespawnedCb  | null = null;
+let onDamagedCb:     OnDamagedCb     | null = null;
+let onDiedCb:        OnDiedCb        | null = null;
+let onRespawnedCb:   OnRespawnedCb   | null = null;
 let onLeaderboardCb: OnLeaderboardCb | null = null;
 
 // ─────────────────────────────────────────────
@@ -94,9 +120,14 @@ let onLeaderboardCb: OnLeaderboardCb | null = null;
 /** Boot the network layer. Call once after the BabylonJS scene is ready. */
 export function initNetwork(babylonScene: Scene) {
     scene  = babylonScene;
-    socket = io(SERVER_URL, { transports: ["websocket"] });
+    // Pass the display name to the server via the auth handshake so it's
+    // available from the very first connection event — no extra round-trip needed.
+    socket = io(SERVER_URL, {
+        transports: ["websocket"],
+        auth: { name: getLocalPlayerName() },
+    });
 
-    socket.on("connect",    () => console.log(`[NET] Connected  id=${socket.id}`));
+    socket.on("connect",    () => console.log(`[NET] Connected  id=${socket.id}  name=${getLocalPlayerName()}`));
     socket.on("disconnect", () => console.log("[NET] Disconnected"));
 
     socket.on("init",              handleInit);
@@ -329,7 +360,7 @@ function spawnRemotePlayer(id: string, state: PlayerState) {
 
     const labelTex = new DynamicTexture(`rp_label_tex_${id}`, { width: 256, height: 64 }, scene, false);
     labelTex.hasAlpha = true;
-    drawNameLabel(labelTex, id.slice(0, 8), playerColor); // colored border matches body
+    drawNameLabel(labelTex, state.name || id.slice(0, 8), playerColor); // use real display name
 
     const labelMat = new StandardMaterial(`rp_label_mat_${id}`, scene);
     labelMat.diffuseTexture = labelTex;

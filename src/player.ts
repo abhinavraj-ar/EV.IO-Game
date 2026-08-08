@@ -10,6 +10,7 @@ import {
     onLeaderboard,
     getRemotePlayerIdFromMesh,
     getMyId,
+    getLocalPlayerName,
     type LeaderboardEntry,
 } from "./network";
 
@@ -83,7 +84,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
         updateHealthUI();
     });
 
-    // ── Called by network.ts when the server confirms our death ───────────────
+    // ── Called by network.ts when the server confirms our death 
     onDied((_killerId: string) => {
         isDead = true;
         currentHealth = 0;
@@ -93,7 +94,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
         if (document.exitPointerLock) document.exitPointerLock();
     });
 
-    // ── Called by network.ts when the server respawns us ───────────────────────
+    // ── Called by network.ts when the server respawns us ─────────────────────
     onRespawned((x: number, y: number, z: number) => {
         currentHealth = maxHealth;
         updateHealthUI();
@@ -109,11 +110,13 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     onLeaderboard((entries: LeaderboardEntry[]) => {
         if (!leaderboardEl) return;
         leaderboardEl.innerHTML = entries.map((e, i) => {
-            const isMe = e.id === getMyId();
+            const isMe  = e.id === getMyId();
             const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
+            // Show own name for our row, remote name for others
+            const displayName = isMe ? `YOU (${getLocalPlayerName()})` : e.name;
             return `<li class="lb-row${isMe ? " lb-me" : ""}">
                 <span class="lb-rank">${medal}</span>
-                <span class="lb-name">${isMe ? "YOU" : e.name}</span>
+                <span class="lb-name">${displayName}</span>
                 <span class="lb-kills">${e.kills}K</span>
                 <span class="lb-pts">${e.points}pts</span>
             </li>`;
