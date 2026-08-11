@@ -1,4 +1,4 @@
-import { Scene, UniversalCamera, Vector3, MeshBuilder, StandardMaterial, Color3 } from "@babylonjs/core";
+import { Scene, UniversalCamera, Vector3, MeshBuilder, StandardMaterial, Color3 ,} from "@babylonjs/core";
 import {
     sendMove,
     sendShoot,
@@ -23,14 +23,30 @@ import {
 
 // Expose the camera so network.ts can read position if needed
 let _camera: UniversalCamera;
+
+
+const gunFireSound = new Audio("/EV.IO-Game/sounds/gun-fire.wav");
+gunFireSound.volume = 0.7;
+
+
+
 export function getCamera(): UniversalCamera { return _camera; }
 
 export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
+    
     const isMobile = isMobileDevice();
+
+    
 
     //Setup Camera & Spawn Point
     const spawnPoint = new Vector3(0, 2, 0); // just above ground
     const camera = new UniversalCamera("playerCamera", spawnPoint.clone(), scene);
+
+//     gunFireSound = new Audio("/sounds/gun-fire.mp3");
+// gunFireSound.volume = 0.5;
+
+    
+
     camera.setTarget(new Vector3(0, 0, 10)); 
     camera.attachControl(canvas, true);
     _camera = camera;
@@ -172,17 +188,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
         });
     }
 
-    // Jump & Landing Detection
-    //
-    // How it works:
-    //   1. On Space, we do ONE single set: camera.cameraDirection.y = JUMP_FORCE.
-    //      BabylonJS inertia + scene.gravity naturally arcs the player up then back down.
-    //      We never touch cameraDirection.y again until the next jump.
-    //
-    //   2. Landing uses a two-phase check so the apex (deltaY ≈ 0) can't fool it:
-    //      Phase A — hasPeaked: wait until the player is genuinely falling (deltaY < -0.02).
-    //      Phase B — once hasPeaked, landing is when the fall stops (deltaY >= -0.005).
-    //      Only after both phases do we set canJump = true again.
+   
 
     const JUMP_FORCE = 2; // single upward impulse injected into cameraDirection.y
     let canJump   = true;     // whether the player is allowed to jump
@@ -302,6 +308,16 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
 
 //Raycast Shooting Mechanic
 function shoot(scene: Scene, canvas: HTMLCanvasElement) {
+    // playGunFireSound();
+
+    gunFireSound.currentTime = 0;
+    gunFireSound.play().catch((error) => {
+        console.error("Gun sound error:", error);
+    });
+
+
+    
+
     const pickInfo = scene.pick(canvas.width / 2, canvas.height / 2);
 
     if (pickInfo.hit && pickInfo.pickedMesh) {
