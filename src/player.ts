@@ -87,6 +87,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     const deathScreen = document.getElementById("death-screen") as HTMLDivElement;
     const respawnBtn  = document.getElementById("respawn-btn")  as HTMLButtonElement;
     const leaderboardEl = document.getElementById("leaderboard-list") as HTMLOListElement;
+    const deathWinnerList = document.getElementById("death-winner-list") as HTMLDivElement;
 
     function updateHealthUI() {
         if (healthFill) {
@@ -137,21 +138,114 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     });
 
     // ── Called by network.ts when the leaderboard changes ───────────────────
-    onLeaderboard((entries: LeaderboardEntry[]) => {
-        if (!leaderboardEl) return;
+    // ── Leaderboard ─────────────────────────────────────────────────────────
+onLeaderboard((entries: LeaderboardEntry[]) => {
+
+    // ============================================================
+    // NORMAL GAME LEADERBOARD
+    // ============================================================
+
+    if (leaderboardEl) {
+
         leaderboardEl.innerHTML = entries.map((e, i) => {
-            const isMe  = e.id === getMyId();
-            const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
-            // Show own name for our row, remote name for others
-            const displayName = isMe ? `YOU (${getLocalPlayerName()})` : e.name;
-            return `<li class="lb-row${isMe ? " lb-me" : ""}">
-                <span class="lb-rank">${medal}</span>
-                <span class="lb-name">${displayName}</span>
-                <span class="lb-kills">${e.kills}K</span>
-                <span class="lb-pts">${e.points}pts</span>
-            </li>`;
+
+            const isMe = e.id === getMyId();
+
+            const medal =
+                i === 0 ? "🥇" :
+                i === 1 ? "🥈" :
+                i === 2 ? "🥉" :
+                `${i + 1}.`;
+
+            const displayName =
+                isMe
+                    ? `YOU (${getLocalPlayerName()})`
+                    : e.name;
+
+            return `
+                <li class="lb-row${isMe ? " lb-me" : ""}">
+
+                    <span class="lb-rank">
+                        ${medal}
+                    </span>
+
+                    <span class="lb-name">
+                        ${displayName}
+                    </span>
+
+                    <span class="lb-kills">
+                        ${e.kills}K
+                    </span>
+
+                    <span class="lb-pts">
+                        ${e.points}pts
+                    </span>
+
+                </li>
+            `;
         }).join("");
-    });
+    }
+
+
+    // ============================================================
+    // WINNER LIST ON DEATH SCREEN
+    // ============================================================
+
+    if (deathWinnerList) {
+
+        // Show only TOP 3 players
+        const winners = entries.slice(0, 3);
+
+        deathWinnerList.innerHTML = winners.map((e, i) => {
+
+            const isMe = e.id === getMyId();
+
+            const medal =
+                i === 0 ? "🥇" :
+                i === 1 ? "🥈" :
+                "🥉";
+
+            const position =
+                i === 0 ? "1ST" :
+                i === 1 ? "2ND" :
+                "3RD";
+
+            const displayName =
+                isMe
+                    ? `YOU (${getLocalPlayerName()})`
+                    : e.name;
+
+            return `
+                <div class="death-winner-row">
+
+                    <div class="winner-position">
+                        ${medal}
+                    </div>
+
+                    <div class="winner-info">
+
+                        <div class="winner-name">
+                            ${displayName}
+                        </div>
+
+                        <div class="winner-stats">
+                            ${e.kills} Kills
+                            &nbsp; • &nbsp;
+                            ${e.points} Points
+                        </div>
+
+                    </div>
+
+                    <div class="winner-place">
+                        ${position}
+                    </div>
+
+                </div>
+            `;
+
+        }).join("");
+    }
+});
 
     // Local damage (e.g. fall damage) — also tells the server via player:hit
     function takeDamageLocal(amount: number) {
