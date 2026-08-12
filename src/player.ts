@@ -85,18 +85,33 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     let isDead = false; // Tracks if the player is currently waiting to respawn
     let matchEnded = false;
 
-    const healthFill  = document.getElementById("health-fill")  as HTMLDivElement;
-    const deathScreen = document.getElementById("death-screen") as HTMLDivElement;
-    const winScreen = document.getElementById("win-screen") as HTMLDivElement;
+const healthFill = document.getElementById("health-fill") as HTMLDivElement;
+const healthText = document.getElementById("health-text") as HTMLSpanElement;
+const deathScreen = document.getElementById("death-screen") as HTMLDivElement;
+const winScreen = document.getElementById("win-screen") as HTMLDivElement;
     const respawnBtn  = document.getElementById("respawn-btn")  as HTMLButtonElement;
     const leaderboardEl = document.getElementById("leaderboard-list") as HTMLOListElement;
 
     function updateHealthUI() {
-        if (healthFill) {
-            const percentage = Math.max(0, (currentHealth / maxHealth) * 100);
-            healthFill.style.width = percentage + "%";
+    const percentage = Math.max(0, (currentHealth / maxHealth) * 100);
+
+    if (healthFill) {
+        healthFill.style.width = percentage + "%";
+
+        if (percentage > 60) {
+            healthFill.style.backgroundColor = "green";
+        } else if (percentage > 30) {
+            healthFill.style.backgroundColor = "yellow";
+        } else {
+            healthFill.style.backgroundColor = "red";
         }
     }
+
+    if (healthText) {
+        healthText.textContent = Math.round(percentage) + "%";
+    }
+}
+    
 
     // ── Called by network.ts when the server says we took damage ──────────────
     onDamaged((health: number, _attackerId: string) => {
