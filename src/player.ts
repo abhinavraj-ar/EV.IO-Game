@@ -10,6 +10,7 @@ import {
     onLeaderboard,
     getRemotePlayerIdFromMesh,
     getMyId,
+    onMatchEnded,
     getLocalPlayerName,
     type LeaderboardEntry,
 } from "./network";
@@ -82,9 +83,11 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     let maxHealth = 100;
     let currentHealth = maxHealth;
     let isDead = false; // Tracks if the player is currently waiting to respawn
+    let matchEnded = false;
 
     const healthFill  = document.getElementById("health-fill")  as HTMLDivElement;
     const deathScreen = document.getElementById("death-screen") as HTMLDivElement;
+    const winScreen = document.getElementById("win-screen") as HTMLDivElement;
     const respawnBtn  = document.getElementById("respawn-btn")  as HTMLButtonElement;
     const leaderboardEl = document.getElementById("leaderboard-list") as HTMLOListElement;
 
@@ -114,6 +117,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
 
     // ── Called by network.ts when the server confirms our death 
     onDied((_killerId: string) => {
+        if (isDead) return;
         isDead = true;
         currentHealth = 0;
         updateHealthUI();
@@ -124,6 +128,79 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
         }
     });
 
+//     onMatchEnded((winnerId: string, winnerName: string) => {
+//     const myId = getMyId();
+
+//     matchEnded = true;
+
+//     if (winnerId === myId) {
+//         if (winScreen) {
+//             winScreen.style.display = "flex";
+//             winScreen.innerText = "🏆 YOU WIN!";
+//         }
+//     } else {
+//         if (winScreen) {
+//             winScreen.style.display = "flex";
+//             winScreen.innerText = `💀 ${winnerName} WINS!`;
+//         }
+//     }
+
+//     isDead = true;
+
+//     if (!isMobile) {
+//         document.exitPointerLock?.();
+//     }
+// });
+
+
+
+onMatchEnded((winnerId: string, winnerName: string) => {
+    const myId = getMyId();
+
+    matchEnded = true;
+    isDead = true;
+
+    const resultIcon = document.getElementById("match-result-icon");
+    const resultTitle = document.getElementById("match-result-title");
+    const resultWinner = document.getElementById("match-result-winner");
+
+    if (winScreen) {
+        winScreen.style.display = "flex";
+    }
+
+    if (winnerId === myId) {
+        // 🏆 WE WON
+        if (resultIcon) {
+            resultIcon.innerText = "🏆";
+        }
+
+        if (resultTitle) {
+            resultTitle.innerText = "YOU WIN!";
+        }
+
+        if (resultWinner) {
+            resultWinner.innerText = `Winner: ${winnerName}`;
+        }
+    } else {
+        // 💀 WE LOST
+        if (resultIcon) {
+            resultIcon.innerText = "💀";
+        }
+
+        if (resultTitle) {
+            resultTitle.innerText = "YOU LOSE!";
+        }
+
+        if (resultWinner) {
+            resultWinner.innerText = `Winner: ${winnerName}`;
+        }
+    }
+
+    if (!isMobile) {
+        document.exitPointerLock?.();
+    }
+});
+
     // ── Called by network.ts when the server respawns us ─────────────────────
     onRespawned((x: number, y: number, z: number) => {
         currentHealth = maxHealth;
@@ -131,6 +208,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
         isDead = false;
         if (deathScreen) deathScreen.style.display = "none";
         camera.position = new Vector3(x, y, z);
+        if (matchEnded) return;
         camera.cameraDirection = new Vector3(0, 0, 0);
         canJump   = true;
         hasPeaked = false;
@@ -173,6 +251,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     //Respawn Button Logic
     if (respawnBtn) {
         respawnBtn.addEventListener("click", () => {
+            if (matchEnded) return;
             // Tell the server to respawn us — it will reply with player:respawned
             sendRespawn();
 
