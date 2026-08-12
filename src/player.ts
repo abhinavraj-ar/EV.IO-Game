@@ -108,7 +108,7 @@ const deathScreen = document.getElementById("death-screen") as HTMLDivElement;
         healthText.textContent = Math.round(percentage) + "%";
     }
 }
-    }
+    
 
     // ── Called by network.ts when the server says we took damage ──────────────
     onDamaged((health: number, _attackerId: string) => {
