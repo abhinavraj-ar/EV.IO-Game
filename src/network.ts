@@ -1,12 +1,4 @@
-/**
- * network.ts — Client-side Socket.io integration for ev.io multiplayer
- *
- * Responsibilities:
- *  - Connect to the Node.js game server
- *  - Send this player's position every frame (throttled)
- *  - Receive other players' states and render them as BabylonJS meshes
- *  - Relay shoot / hit / respawn events
- */
+
 
 import { io, Socket } from "socket.io-client";
 import {
@@ -51,12 +43,6 @@ interface RemotePlayer {
     labelTex:  DynamicTexture;
 }
 
-// ─────────────────────────────────────────────
-// Module state
-// ─────────────────────────────────────────────
-// In development this falls back to localhost:3001.
-// In production set the VITE_SERVER_URL GitHub Secret to your Railway HTTPS URL
-// e.g.  https://your-app.up.railway.app
 const _rawUrl   = import.meta.env.VITE_SERVER_URL as string | undefined;
 const SERVER_URL = (_rawUrl && _rawUrl.length > 0) ? _rawUrl : "http://localhost:3001";
 
@@ -102,16 +88,20 @@ let myId:   string = "";
 /** All remote players keyed by socket ID */
 const remotePlayers = new Map<string, RemotePlayer>();
 
-// Callbacks the rest of the game can subscribe to
+
+
 type OnDamagedCb     = (health: number, attackerId: string) => void;
 type OnDiedCb        = (killerId: string) => void;
 type OnRespawnedCb   = (x: number, y: number, z: number) => void;
 type OnLeaderboardCb = (entries: LeaderboardEntry[]) => void;
+type OnMatchEndedCb  = (winnerId: string, winnerName: string) => void;
 
 let onDamagedCb:     OnDamagedCb     | null = null;
 let onDiedCb:        OnDiedCb        | null = null;
 let onRespawnedCb:   OnRespawnedCb   | null = null;
 let onLeaderboardCb: OnLeaderboardCb | null = null;
+let onMatchEndedCb:  OnMatchEndedCb  | null = null;
+
 
 // ─────────────────────────────────────────────
 // Public API
@@ -136,6 +126,15 @@ export function initNetwork(babylonScene: Scene) {
     socket.on("player:moved",      handlePlayerMoved);
     socket.on("player:damaged",    handlePlayerDamaged);
     socket.on("player:died",       handlePlayerDied);
+
+    socket.on("match:ended", (data) => {
+    console.log("🏆 MATCH ENDED");
+    console.log("Winner ID:", data.winnerId);
+    console.log("Winner Name:", data.winnerName);
+
+    onMatchEndedCb?.(data.winnerId, data.winnerName);
+});
+
     socket.on("player:respawned",  handlePlayerRespawned);
     socket.on("leaderboard:update", handleLeaderboardUpdate);
 }
@@ -169,6 +168,12 @@ export function onDamaged(cb: OnDamagedCb)   { onDamagedCb  = cb; }
 
 /** Register a callback for when OUR player dies. */
 export function onDied(cb: OnDiedCb)          { onDiedCb     = cb; }
+
+export function onMatchEnded(cb: OnMatchEndedCb) {
+    onMatchEndedCb = cb;
+}
+
+
 
 /** Register a callback for when OUR player respawns (server-authoritative). */
 export function onRespawned(cb: OnRespawnedCb) { onRespawnedCb = cb; }

@@ -1,25 +1,3 @@
-/**
- * ev.io Clone — Multiplayer Server
- * Node.js + Express + Socket.io
- *
- * Events (Client → Server):
- *   player:move      { x, y, z, rotY }
- *   player:shoot     { dirX, dirY, dirZ }
- *   player:hit       { targetId, damage }
- *   player:respawn   (no payload)
- *
- * Events (Server → Client):
- *   init                { id, players: { [id]: PlayerState } }
- *   player:joined       { id, state: PlayerState }
- *   player:left         { id }
- *   player:moved        { id, x, y, z, rotY }
- *   player:shot         { id, dirX, dirY, dirZ }
- *   player:damaged      { id, health, attackerId }
- *   player:died         { id, killerId }
- *   player:respawned    { id, x, y, z, health }
- *   leaderboard:update  { entries: [{ id, name, kills, deaths, points }] }
- */
-
 const express   = require("express");
 const http      = require("http");
 const cors      = require("cors");
@@ -61,6 +39,9 @@ const players = new Map();
 let spawnIndex = 0;
 
 const POINTS_PER_KILL = 10;
+
+const KILLS_TO_WIN = 2;
+
 
 function getNextSpawn() {
     const pos = SPAWN_POSITIONS[spawnIndex % SPAWN_POSITIONS.length];
@@ -215,6 +196,8 @@ io.on("connection", (socket) => {
         const attacker = players.get(id);
         const target   = players.get(data.targetId);
         if (!attacker || attacker.isDead) return;
+    
+
         if (!target   || target.isDead)   return;
 
         const damage = Math.min(Math.max(Number(data.damage) || 10, 1), 50); // clamp 1-50
@@ -232,7 +215,22 @@ io.on("connection", (socket) => {
             target.deaths++;
             attacker.kills++;
 
+            
+}
+
             console.log(`[!] ${id} killed ${target.id}  | K:${attacker.kills} (${attacker.kills * POINTS_PER_KILL}pts)`);
+
+            if (attacker.kills >= KILLS_TO_WIN) {
+    console.log(`[🏆] ${attacker.name} WON THE MATCH!`);
+
+    io.emit("match:ended", {
+        winnerId: attacker.id,
+        winnerName: attacker.name,
+    });
+
+
+    
+
 
             // Notify everyone of the kill
             io.emit("player:died", {
