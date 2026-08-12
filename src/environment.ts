@@ -10,20 +10,14 @@ export function createEnvironment(scene: Scene) {
     const groundMat = new StandardMaterial("groundMat", scene);
     groundMat.diffuseColor = new Color3(0.2, 0.2, 0.2); // Dark grey
     ground.material = groundMat;
-    
-    // This ALONE is what blocks the player camera
-    ground.checkCollisions = true; 
-
+    ground.checkCollisions = true;
 
     // 3. Create static walls
     for (let i = 0; i < 4; i++) {
         const wall = MeshBuilder.CreateBox("wall_" + i, { width: 8, height: 4, depth: 2 }, scene);
         wall.position = new Vector3((i * 10) - 15, 2, 10);
-        
-        // This ALONE is what blocks the player camera
         wall.checkCollisions = true;
     }
-
 
     // 4. Create randomly scattered solid crates
     for (let i = 0; i < 20; i++) {
@@ -37,8 +31,6 @@ export function createEnvironment(scene: Scene) {
         const boxMat = new StandardMaterial("boxMat", scene);
         boxMat.diffuseColor = new Color3(0.8, 0.2, 0.2); // Red crates
         box.material = boxMat;
-        
-        // This ALONE is what blocks the player camera
         box.checkCollisions = true;
     }
 }
