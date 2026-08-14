@@ -127,6 +127,149 @@ body {
     background-color: #ff6666; 
     transform: scale(1.05); 
 }
+/* ============================================================
+   WINNER LIST ON DEATH SCREEN
+   ============================================================ */
+
+#death-winner-box {
+    width: min(500px, 90vw);
+    margin: 10px 0 25px 0;
+    padding: 20px;
+
+    background: rgba(0, 0, 0, 0.75);
+
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    border-radius: 12px;
+
+    box-sizing: border-box;
+}
+
+#death-winner-box h2 {
+    margin: 0 0 15px 0;
+
+    text-align: center;
+
+    font-size: 28px;
+    letter-spacing: 2px;
+}
+
+
+/* Individual winner row */
+
+.death-winner-row {
+    display: flex;
+
+    align-items: center;
+
+    width: 100%;
+
+    padding: 10px 12px;
+
+    margin: 7px 0;
+
+    box-sizing: border-box;
+
+    background: rgba(255, 255, 255, 0.08);
+
+    border-radius: 8px;
+}
+
+
+/* Medal */
+
+.winner-position {
+    width: 55px;
+
+    font-size: 28px;
+
+    text-align: center;
+
+    flex-shrink: 0;
+}
+
+
+/* Player information */
+
+.winner-info {
+    flex: 1;
+
+    min-width: 0;
+}
+
+
+.winner-name {
+    font-size: 19px;
+
+    font-weight: bold;
+
+    white-space: nowrap;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+}
+
+
+.winner-stats {
+    margin-top: 3px;
+
+    font-size: 14px;
+
+    opacity: 0.75;
+}
+
+
+/* 1ST / 2ND / 3RD */
+
+.winner-place {
+    width: 55px;
+
+    text-align: right;
+
+    font-size: 13px;
+
+    font-weight: bold;
+
+    opacity: 0.8;
+}
+
+
+/* Mobile */
+
+@media (max-width: 600px) {
+
+    #death-screen h1 {
+        font-size: 42px;
+        margin-bottom: 10px;
+    }
+
+    #death-winner-box {
+        width: 92vw;
+        padding: 12px;
+    }
+
+    #death-winner-box h2 {
+        font-size: 22px;
+    }
+
+    .winner-position {
+        width: 45px;
+        font-size: 24px;
+    }
+
+    .winner-name {
+        font-size: 16px;
+    }
+
+    .winner-stats {
+        font-size: 12px;
+    }
+
+    .winner-place {
+        width: 45px;
+        font-size: 11px;
+    }
+}
 
 /* ── Leaderboard HUD ───────────────────────────────────────────────────────── */
 #leaderboard {
@@ -498,4 +641,160 @@ body.is-mobile.landscape-small #action-buttons {
 #play-again-btn:hover {
     transform: scale(1.05);
     box-shadow: 0 0 25px rgba(53, 255, 107, 0.6);
+}
+/* ================================
+   LARGE USERNAME START SCREEN
+   ================================ */
+
+#start-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    background:
+        radial-gradient(circle at center,
+        rgba(40, 50, 70, 0.6),
+        rgba(0, 0, 0, 0.97));
+
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+#start-box {
+    width: 600px;
+    min-height: 430px;
+
+    padding: 65px 60px;
+
+    box-sizing: border-box;
+
+    text-align: center;
+
+    background: rgba(8, 8, 8, 0.94);
+
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+
+    box-shadow:
+        0 0 60px rgba(0, 0, 0, 0.9),
+        inset 0 0 30px rgba(255, 255, 255, 0.04);
+}
+
+/* GAME TITLE */
+
+#start-box h1 {
+    margin: 0 0 25px;
+
+    font-size: 85px;
+    font-weight: 900;
+
+    letter-spacing: 10px;
+
+    color: white;
+
+    text-shadow:
+        0 0 15px rgba(255, 255, 255, 0.6),
+        0 0 40px rgba(255, 255, 255, 0.3);
+}
+
+/* ENTER USERNAME TEXT */
+
+#start-box p {
+    margin: 15px 0 25px;
+
+    color: #aaa;
+
+    font-size: 18px;
+
+    letter-spacing: 3px;
+}
+
+/* USERNAME INPUT */
+
+#username-input {
+    width: 100%;
+    height: 65px;
+
+    box-sizing: border-box;
+
+    padding: 15px 20px;
+
+    margin-bottom: 25px;
+
+    background: #151515;
+
+    border: 2px solid #555;
+    border-radius: 10px;
+
+    outline: none;
+
+    color: white;
+
+    font-size: 22px;
+
+    text-align: center;
+}
+
+#username-input:focus {
+    border-color: white;
+
+    box-shadow:
+        0 0 15px rgba(255, 255, 255, 0.25);
+}
+
+#username-input::placeholder {
+    color: #666;
+}
+
+/* PLAY BUTTON */
+
+#play-btn {
+    width: 100%;
+    height: 65px;
+
+    border: none;
+    border-radius: 10px;
+
+    background: white;
+
+    color: black;
+
+    font-size: 22px;
+    font-weight: bold;
+
+    letter-spacing: 4px;
+
+    cursor: pointer;
+
+    transition: 0.2s;
+}
+
+#play-btn:hover {
+    transform: scale(1.04);
+
+    background: #e5e5e5;
+
+    box-shadow:
+        0 0 30px rgba(255, 255, 255, 0.4);
+}
+
+#play-btn:active {
+    transform: scale(0.98);
+}
+
+/* ERROR */
+
+#username-error {
+    min-height: 20px;
+
+    margin-top: 20px !important;
+
+    color: #ff5555 !important;
+
+    font-size: 14px !important;
+
+    letter-spacing: 1px !important;
 }

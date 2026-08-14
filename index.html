@@ -11,11 +11,45 @@
     <link rel="stylesheet" href="./src/style.css">
   </head>
   <body>
-    <!-- Death Screen Overlay -->
-    <div id="death-screen">
-      <h1>YOU DIED</h1>
-      <button id="respawn-btn">Respawn</button>
+    <!-- START / USERNAME SCREEN -->
+<div id="start-screen">
+    <div id="start-box">
+        <h1>EV.IO</h1>
+        <p>ENTER YOUR USERNAME</p>
+
+        <input
+            type="text"
+            id="username-input"
+            placeholder="Enter username"
+            maxlength="16"
+            autocomplete="off"
+        />
+
+        <button id="play-btn">PLAY</button>
+
+        <p id="username-error"></p>
     </div>
+</div>
+    
+
+
+    <!-- Death Screen Overlay -->
+    <!-- Death Screen Overlay -->
+<div id="death-screen">
+
+  <h1>YOU DIED</h1>
+
+  <div id="death-winner-box">
+    <h2>🏆 WINNERS</h2>
+
+    <div id="death-winner-list">
+      <!-- Winners will be inserted here by player.ts -->
+    </div>
+  </div>
+
+  <button id="respawn-btn">Respawn</button>
+
+</div>
 
     <!-- Match Result Screen -->
 <div id="win-screen">
