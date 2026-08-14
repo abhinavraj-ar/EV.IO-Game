@@ -1,63 +1,165 @@
-import { Engine, Scene, Vector3, HavokPlugin } from "@babylonjs/core";
-import HavokPhysics from "@babylonjs/havok"; // Import Havok
+// =====================================================
+// START SCREEN / USERNAME
+// =====================================================
+
+const startScreen = document.getElementById("start-screen") as HTMLDivElement;
+const usernameInput = document.getElementById("username-input") as HTMLInputElement;
+const playButton = document.getElementById("play-btn") as HTMLButtonElement;
+const usernameError = document.getElementById("username-error") as HTMLParagraphElement;
+
+let playerUsername = "";
+
+playButton.addEventListener("click", startGame);
+
+usernameInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+        startGame();
+    }
+});
+
+function startGame() {
+
+    const username = usernameInput.value.trim();
+
+    if (username.length === 0) {
+        usernameError.textContent = "Please enter a username";
+        usernameInput.focus();
+        return;
+    }
+
+    if (username.length < 2) {
+        usernameError.textContent = "Username must be at least 2 characters";
+        usernameInput.focus();
+        return;
+    }
+
+   playerUsername = username;
+
+// Save using the key that network.ts already uses
+localStorage.setItem("ev_player_name", playerUsername);
+
+startScreen.style.display = "none";
+
+// Start the game
+startGameEngine();
+}
+
+
+// =====================================================
+// GAME IMPORTS
+// =====================================================
+
+import {
+    Engine,
+    Scene,
+    Vector3,
+    HavokPlugin
+} from "@babylonjs/core";
+
+import HavokPhysics from "@babylonjs/havok";
+
 import { createEnvironment } from "./environment";
 import { setupPlayer } from "./player";
 import { initNetwork } from "./network";
 
+
+// =====================================================
+// ENGINE
+// =====================================================
+
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
+
 const engine = new Engine(canvas, true);
 
-// ── Ensure the death screen is hidden on fresh load ───────────────────────────
-const deathScreen = document.getElementById("death-screen") as HTMLDivElement;
-if (deathScreen) deathScreen.style.display = "none";
 
-// Changed to async
+// =====================================================
+// DEATH SCREEN
+// =====================================================
+
+const deathScreen =
+    document.getElementById("death-screen") as HTMLDivElement;
+
+if (deathScreen) {
+    deathScreen.style.display = "none";
+}
+
+
+// =====================================================
+// CREATE SCENE
+// =====================================================
+
 const createScene = async () => {
+
     const scene = new Scene(engine);
+
     scene.gravity = new Vector3(0, -0.15, 0);
+
     scene.collisionsEnabled = true;
 
-    // Initialize Havok Physics
     const havokInstance = await HavokPhysics();
-    const hk = new HavokPlugin(true, havokInstance);
-    scene.enablePhysics(new Vector3(0, -9.81, 0), hk); // Earth gravity
+
+    const hk = new HavokPlugin(
+        true,
+        havokInstance
+    );
+
+    scene.enablePhysics(
+        new Vector3(0, -9.81, 0),
+        hk
+    );
 
     createEnvironment(scene);
+
     setupPlayer(scene, canvas);
 
-    // Boot multiplayer networking — must be after setupPlayer so callbacks are registered
     initNetwork(scene);
 
     return scene;
 };
 
-// Use .then() because createScene is now async
-createScene().then((scene) => {
-    engine.runRenderLoop(() => {
-        scene.render();
+
+// =====================================================
+// START GAME
+// =====================================================
+
+function startGameEngine() {
+
+    createScene().then((scene) => {
+
+        engine.runRenderLoop(() => {
+            scene.render();
+        });
+
+        engine.resize();
+
     });
 
-    // Force correct canvas size after scene is ready
-    engine.resize();
-});
+}
 
-// ── Resize handlers ───────────────────────────────────────────────────────────
 
-// Standard resize (desktop window resize, orientation change)
+// =====================================================
+// RESIZE
+// =====================================================
+
 window.addEventListener("resize", () => {
     engine.resize();
 });
 
-// Mobile: fires when the browser chrome (address bar) appears/disappears,
-// changing the available visual viewport height
 if (window.visualViewport) {
-    window.visualViewport.addEventListener("resize", () => {
-        engine.resize();
-    });
+
+    window.visualViewport.addEventListener(
+        "resize",
+        () => {
+            engine.resize();
+        }
+    );
+
 }
 
-// Also resize on orientation change (belt-and-suspenders)
 window.addEventListener("orientationchange", () => {
-    // Small delay to let the browser settle after rotation
-    setTimeout(() => engine.resize(), 150);
+
+    setTimeout(() => {
+        engine.resize();
+    }, 150);
+
 });
