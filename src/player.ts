@@ -26,7 +26,7 @@ import {
 let _camera: UniversalCamera;
 
 
-const gunFireSound = new Audio("/EV.IO-Game/sounds/gun-fire.wav");
+const gunFireSound = new Audio("/sounds/gun-fire.wav");
 gunFireSound.volume = 0.7;
 
 
@@ -43,8 +43,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     const spawnPoint = new Vector3(0, 2, 0); // just above ground
     const camera = new UniversalCamera("playerCamera", spawnPoint.clone(), scene);
 
-//     gunFireSound = new Audio("/sounds/gun-fire.mp3");
-// gunFireSound.volume = 0.5;
+
 
     
 
