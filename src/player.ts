@@ -49,7 +49,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     
 
     //Setup Camera & Spawn Point
-    const spawnPoint = new Vector3(0, 2, 0); // just above ground
+    const spawnPoint = new Vector3(0, 1, 0); // just above ground
     const camera = new UniversalCamera("playerCamera", spawnPoint.clone(), scene);
 
 
