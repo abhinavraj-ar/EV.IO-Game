@@ -66,11 +66,10 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     camera.keysLeft.push(65);  // A
     camera.keysRight.push(68); // D
     camera.speed = 0.4;
-    // Lower angular sensitivity on desktop; mobile look is manual
+    
     camera.angularSensibility = isMobile ? 9999999 : 2500; // effectively disable built-in mouse look on mobile
 
-    // applyGravity=true lets BabylonJS handle floor collision via scene.gravity.
-    // We intercept the cameraDirection each frame to add our own jump arc on top.
+    
     camera.applyGravity = true;
     camera.checkCollisions = true;
 
@@ -86,6 +85,9 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     gun.parent = camera; 
     gun.position = new Vector3(0.5, -0.4, 1);
     gun.isPickable = false; // Prevent shooting yourself
+
+
+
 
     //Health & Death System
     let maxHealth = 100;
@@ -152,31 +154,6 @@ const winScreen = document.getElementById("win-screen") as HTMLDivElement;
         }
     });
 
-//     onMatchEnded((winnerId: string, winnerName: string) => {
-//     const myId = getMyId();
-
-//     matchEnded = true;
-
-//     if (winnerId === myId) {
-//         if (winScreen) {
-//             winScreen.style.display = "flex";
-//             winScreen.innerText = "🏆 YOU WIN!";
-//         }
-//     } else {
-//         if (winScreen) {
-//             winScreen.style.display = "flex";
-//             winScreen.innerText = `💀 ${winnerName} WINS!`;
-//         }
-//     }
-
-//     isDead = true;
-
-//     if (!isMobile) {
-//         document.exitPointerLock?.();
-//     }
-// });
-
-
 
 onMatchEnded((winnerId: string, winnerName: string) => {
     const myId = getMyId();
@@ -206,7 +183,7 @@ onMatchEnded((winnerId: string, winnerName: string) => {
             resultWinner.innerText = `Winner: ${winnerName}`;
         }
     } else {
-        // 💀 WE LOST
+        
         if (resultIcon) {
             resultIcon.innerText = "💀";
         }
@@ -288,10 +265,9 @@ onLeaderboard((entries: LeaderboardEntry[]) => {
     }
 
 
-    // ============================================================
+    
     // WINNER LIST ON DEATH SCREEN
-    // ============================================================
-
+    
     if (deathWinnerList) {
 
         // Show only TOP 3 players
