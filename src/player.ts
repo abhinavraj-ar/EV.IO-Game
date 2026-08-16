@@ -30,12 +30,21 @@ const gunFireSound = new Audio("/sounds/gun-fire.wav");
 gunFireSound.volume = 0.7;
 
 
+const backgroundSound = new Audio("/sounds/background.mp3");
+backgroundSound.loop = true;
+backgroundSound.volume = 0.25;
+
+
 
 export function getCamera(): UniversalCamera { return _camera; }
 
 export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     
     const isMobile = isMobileDevice();
+
+    backgroundSound.play().catch((error) => {
+    console.error("Background sound error:", error);
+});
 
     
 
