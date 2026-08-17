@@ -1,4 +1,12 @@
-import { Scene, UniversalCamera, Vector3, MeshBuilder, StandardMaterial, Color3 ,} from "@babylonjs/core";
+import {
+    Scene,
+    UniversalCamera,
+    Vector3,
+    MeshBuilder,
+    StandardMaterial,
+    Color3,
+    TransformNode
+} from "@babylonjs/core";
 import {
     sendMove,
     sendShoot,
@@ -26,8 +34,13 @@ import {
 let _camera: UniversalCamera;
 
 
-const gunFireSound = new Audio("/EV.IO-Game/sounds/gun-fire.wav");
+const gunFireSound = new Audio("/sounds/gun-fire.wav");
 gunFireSound.volume = 0.7;
+
+
+const backgroundSound = new Audio("/sounds/background.mp3");
+backgroundSound.loop = true;
+backgroundSound.volume = 0.25;
 
 
 
@@ -37,14 +50,17 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     
     const isMobile = isMobileDevice();
 
+    backgroundSound.play().catch((error) => {
+    console.error("Background sound error:", error);
+});
+
     
 
     //Setup Camera & Spawn Point
-    const spawnPoint = new Vector3(0, 2, 0); // just above ground
+    const spawnPoint = new Vector3(0, 1, 0); // just above ground
     const camera = new UniversalCamera("playerCamera", spawnPoint.clone(), scene);
 
-//     gunFireSound = new Audio("/sounds/gun-fire.mp3");
-// gunFireSound.volume = 0.5;
+
 
     
 
@@ -58,11 +74,10 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     camera.keysLeft.push(65);  // A
     camera.keysRight.push(68); // D
     camera.speed = 0.4;
-    // Lower angular sensitivity on desktop; mobile look is manual
+    
     camera.angularSensibility = isMobile ? 9999999 : 2500; // effectively disable built-in mouse look on mobile
 
-    // applyGravity=true lets BabylonJS handle floor collision via scene.gravity.
-    // We intercept the cameraDirection each frame to add our own jump arc on top.
+    
     camera.applyGravity = true;
     camera.checkCollisions = true;
 
@@ -71,19 +86,197 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     camera.ellipsoidOffset = new Vector3(0, 1, 0);
 
     //The Gun Model
-    const gun = MeshBuilder.CreateBox("gun", { width: 0.2, height: 0.2, depth: 1 }, scene);
-    const gunMat = new StandardMaterial("gunMat", scene);
-    gunMat.diffuseColor = new Color3(0.2, 0.8, 0.2); 
-    gun.material = gunMat;
-    gun.parent = camera; 
-    gun.position = new Vector3(0.5, -0.4, 1);
-    gun.isPickable = false; // Prevent shooting yourself
+    // 3D Gun Model
+
+
+        
+// Prevent shooting yourself
+
+
+
 
     //Health & Death System
     let maxHealth = 100;
     let currentHealth = maxHealth;
-    let isDead = false; // Tracks if the player is currently waiting to respawn
-    let matchEnded = false;
+
+// =============================
+// 3D SCI-FI GUN
+// =============================
+
+const gunRoot = new TransformNode("gunRoot", scene);
+gunRoot.parent = camera;
+
+// -----------------------------
+// Gun materials
+// -----------------------------
+
+const gunBodyMat = new StandardMaterial("gunBodyMat", scene);
+gunBodyMat.diffuseColor = new Color3(0.08, 0.09, 0.11);
+gunBodyMat.specularColor = new Color3(0.5, 0.5, 0.5);
+
+const gunMetalMat = new StandardMaterial("gunMetalMat", scene);
+gunMetalMat.diffuseColor = new Color3(0.25, 0.28, 0.32);
+gunMetalMat.specularColor = new Color3(0.8, 0.8, 0.8);
+
+const gunEnergyMat = new StandardMaterial("gunEnergyMat", scene);
+gunEnergyMat.diffuseColor = new Color3(0.1, 0.5, 1.0);
+gunEnergyMat.emissiveColor = new Color3(0.05, 0.25, 0.8);
+
+// -----------------------------
+// Main gun body
+// -----------------------------
+
+const gunBody = MeshBuilder.CreateBox(
+    "gunBody",
+    {
+        width: 0.45,
+        height: 0.30,
+        depth: 1.15
+    },
+    scene
+);
+
+gunBody.material = gunBodyMat;
+gunBody.parent = gunRoot;
+gunBody.position = new Vector3(0, 0, 0);
+
+// -----------------------------
+// Upper rail
+// -----------------------------
+
+const upperRail = MeshBuilder.CreateBox(
+    "upperRail",
+    {
+        width: 0.22,
+        height: 0.10,
+        depth: 0.75
+    },
+    scene
+);
+
+upperRail.material = gunMetalMat;
+upperRail.parent = gunRoot;
+upperRail.position = new Vector3(0, 0.20, -0.05);
+
+// -----------------------------
+// Barrel
+// -----------------------------
+
+const barrel = MeshBuilder.CreateCylinder(
+    "barrel",
+    {
+        diameter: 0.13,
+        height: 0.75,
+        tessellation: 16
+    },
+    scene
+);
+
+barrel.rotation.x = Math.PI / 2;
+barrel.material = gunMetalMat;
+barrel.parent = gunRoot;
+barrel.position = new Vector3(0, 0.02, 0.82);
+
+// -----------------------------
+// Barrel energy core
+// -----------------------------
+
+const energyCore = MeshBuilder.CreateCylinder(
+    "energyCore",
+    {
+        diameter: 0.07,
+        height: 0.60,
+        tessellation: 12
+    },
+    scene
+);
+
+energyCore.rotation.x = Math.PI / 2;
+energyCore.material = gunEnergyMat;
+energyCore.parent = gunRoot;
+energyCore.position = new Vector3(0, 0.02, 0.85);
+
+// -----------------------------
+// Grip
+// -----------------------------
+
+const grip = MeshBuilder.CreateBox(
+    "grip",
+    {
+        width: 0.28,
+        height: 0.65,
+        depth: 0.35
+    },
+    scene
+);
+
+grip.material = gunBodyMat;
+grip.parent = gunRoot;
+grip.position = new Vector3(0, -0.42, -0.15);
+
+// Slight backward angle
+grip.rotation.z = -0.15;
+
+// -----------------------------
+// Trigger guard
+// -----------------------------
+
+const triggerGuard = MeshBuilder.CreateBox(
+    "triggerGuard",
+    {
+        width: 0.30,
+        height: 0.08,
+        depth: 0.25
+    },
+    scene
+);
+
+triggerGuard.material = gunMetalMat;
+triggerGuard.parent = gunRoot;
+triggerGuard.position = new Vector3(0, -0.18, 0.05);
+
+// -----------------------------
+// Side energy panel
+// -----------------------------
+
+const sidePanel = MeshBuilder.CreateBox(
+    "sidePanel",
+    {
+        width: 0.04,
+        height: 0.16,
+        depth: 0.45
+    },
+    scene
+);
+
+sidePanel.material = gunEnergyMat;
+sidePanel.parent = gunRoot;
+sidePanel.position = new Vector3(0.24, 0.05, 0);
+
+// -----------------------------
+// Attach gun to FPS camera
+// -----------------------------
+
+gunRoot.position = new Vector3(0.55, -0.45, 1.1);
+gunRoot.rotation = new Vector3(0, 0, 0);
+gunRoot.scaling = new Vector3(0.75, 0.75, 0.75);
+
+// Don't let gun interfere with shooting raycast
+[
+    gunBody,
+    upperRail,
+    barrel,
+    energyCore,
+    grip,
+    triggerGuard,
+    sidePanel
+].forEach(mesh => {
+    mesh.isPickable = false;
+});
+
+let isDead = false;
+let matchEnded = false;
+
 
 const healthFill = document.getElementById("health-fill") as HTMLDivElement;
 const healthText = document.getElementById("health-text") as HTMLSpanElement;
@@ -144,31 +337,6 @@ const winScreen = document.getElementById("win-screen") as HTMLDivElement;
         }
     });
 
-//     onMatchEnded((winnerId: string, winnerName: string) => {
-//     const myId = getMyId();
-
-//     matchEnded = true;
-
-//     if (winnerId === myId) {
-//         if (winScreen) {
-//             winScreen.style.display = "flex";
-//             winScreen.innerText = "🏆 YOU WIN!";
-//         }
-//     } else {
-//         if (winScreen) {
-//             winScreen.style.display = "flex";
-//             winScreen.innerText = `💀 ${winnerName} WINS!`;
-//         }
-//     }
-
-//     isDead = true;
-
-//     if (!isMobile) {
-//         document.exitPointerLock?.();
-//     }
-// });
-
-
 
 onMatchEnded((winnerId: string, winnerName: string) => {
     const myId = getMyId();
@@ -198,7 +366,7 @@ onMatchEnded((winnerId: string, winnerName: string) => {
             resultWinner.innerText = `Winner: ${winnerName}`;
         }
     } else {
-        // 💀 WE LOST
+        
         if (resultIcon) {
             resultIcon.innerText = "💀";
         }
@@ -280,10 +448,9 @@ onLeaderboard((entries: LeaderboardEntry[]) => {
     }
 
 
-    // ============================================================
+    
     // WINNER LIST ON DEATH SCREEN
-    // ============================================================
-
+    
     if (deathWinnerList) {
 
         // Show only TOP 3 players
