@@ -5,7 +5,8 @@ import {
     MeshBuilder,
     StandardMaterial,
     Color3,
-    TransformNode
+    TransformNode,
+    Ray,
 } from "@babylonjs/core";
 import {
     sendMove,
@@ -47,14 +48,14 @@ backgroundSound.volume = 0.25;
 export function getCamera(): UniversalCamera { return _camera; }
 
 export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
-    
+
     const isMobile = isMobileDevice();
 
     backgroundSound.play().catch((error) => {
-    console.error("Background sound error:", error);
-});
+        console.error("Background sound error:", error);
+    });
 
-    
+
 
     //Setup Camera & Spawn Point
     const spawnPoint = new Vector3(0, 1, 0); // just above ground
@@ -62,22 +63,22 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
 
 
 
-    
 
-    camera.setTarget(new Vector3(0, 0, 10)); 
+
+    camera.setTarget(new Vector3(0, 0, 10));
     camera.attachControl(canvas, true);
     _camera = camera;
-    
+
     //Physics & Controls Setup
     camera.keysUp.push(87);    // W
     camera.keysDown.push(83);  // S
     camera.keysLeft.push(65);  // A
     camera.keysRight.push(68); // D
     camera.speed = 0.4;
-    
+
     camera.angularSensibility = isMobile ? 9999999 : 2500; // effectively disable built-in mouse look on mobile
 
-    
+
     camera.applyGravity = true;
     camera.checkCollisions = true;
 
@@ -89,8 +90,8 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     // 3D Gun Model
 
 
-        
-// Prevent shooting yourself
+
+    // Prevent shooting yourself
 
 
 
@@ -99,213 +100,295 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     let maxHealth = 100;
     let currentHealth = maxHealth;
 
-// =============================
-// 3D SCI-FI GUN
-// =============================
+    // =============================
+    // 3D SCI-FI GUN
+    // =============================
 
-const gunRoot = new TransformNode("gunRoot", scene);
-gunRoot.parent = camera;
+    const gunRoot = new TransformNode("gunRoot", scene);
+    gunRoot.parent = camera;
 
-// -----------------------------
-// Gun materials
-// -----------------------------
+    // -----------------------------
+    // Gun materials
+    // -----------------------------
 
-const gunBodyMat = new StandardMaterial("gunBodyMat", scene);
-gunBodyMat.diffuseColor = new Color3(0.08, 0.09, 0.11);
-gunBodyMat.specularColor = new Color3(0.5, 0.5, 0.5);
+    const gunBodyMat = new StandardMaterial("gunBodyMat", scene);
+    gunBodyMat.diffuseColor = new Color3(0.08, 0.09, 0.11);
+    gunBodyMat.specularColor = new Color3(0.5, 0.5, 0.5);
 
-const gunMetalMat = new StandardMaterial("gunMetalMat", scene);
-gunMetalMat.diffuseColor = new Color3(0.25, 0.28, 0.32);
-gunMetalMat.specularColor = new Color3(0.8, 0.8, 0.8);
+    const gunMetalMat = new StandardMaterial("gunMetalMat", scene);
+    gunMetalMat.diffuseColor = new Color3(0.25, 0.28, 0.32);
+    gunMetalMat.specularColor = new Color3(0.8, 0.8, 0.8);
 
-const gunEnergyMat = new StandardMaterial("gunEnergyMat", scene);
-gunEnergyMat.diffuseColor = new Color3(0.1, 0.5, 1.0);
-gunEnergyMat.emissiveColor = new Color3(0.05, 0.25, 0.8);
+    const gunEnergyMat = new StandardMaterial("gunEnergyMat", scene);
+    gunEnergyMat.diffuseColor = new Color3(0.1, 0.5, 1.0);
+    gunEnergyMat.emissiveColor = new Color3(0.05, 0.25, 0.8);
 
-// -----------------------------
-// Main gun body
-// -----------------------------
+    // -----------------------------
+    // Main gun body
+    // -----------------------------
 
-const gunBody = MeshBuilder.CreateBox(
-    "gunBody",
-    {
-        width: 0.45,
-        height: 0.30,
-        depth: 1.15
-    },
-    scene
-);
+    const gunBody = MeshBuilder.CreateBox(
+        "gunBody",
+        {
+            width: 0.45,
+            height: 0.30,
+            depth: 1.15
+        },
+        scene
+    );
 
-gunBody.material = gunBodyMat;
-gunBody.parent = gunRoot;
-gunBody.position = new Vector3(0, 0, 0);
+    gunBody.material = gunBodyMat;
+    gunBody.parent = gunRoot;
+    gunBody.position = new Vector3(0, 0, 0);
 
-// -----------------------------
-// Upper rail
-// -----------------------------
+    // -----------------------------
+    // Upper rail
+    // -----------------------------
 
-const upperRail = MeshBuilder.CreateBox(
-    "upperRail",
-    {
-        width: 0.22,
-        height: 0.10,
-        depth: 0.75
-    },
-    scene
-);
+    const upperRail = MeshBuilder.CreateBox(
+        "upperRail",
+        {
+            width: 0.22,
+            height: 0.10,
+            depth: 0.75
+        },
+        scene
+    );
 
-upperRail.material = gunMetalMat;
-upperRail.parent = gunRoot;
-upperRail.position = new Vector3(0, 0.20, -0.05);
+    upperRail.material = gunMetalMat;
+    upperRail.parent = gunRoot;
+    upperRail.position = new Vector3(0, 0.20, -0.05);
 
-// -----------------------------
-// Barrel
-// -----------------------------
+    // -----------------------------
+    // Barrel
+    // -----------------------------
 
-const barrel = MeshBuilder.CreateCylinder(
-    "barrel",
-    {
-        diameter: 0.13,
-        height: 0.75,
-        tessellation: 16
-    },
-    scene
-);
+    const barrel = MeshBuilder.CreateCylinder(
+        "barrel",
+        {
+            diameter: 0.13,
+            height: 0.75,
+            tessellation: 16
+        },
+        scene
+    );
 
-barrel.rotation.x = Math.PI / 2;
-barrel.material = gunMetalMat;
-barrel.parent = gunRoot;
-barrel.position = new Vector3(0, 0.02, 0.82);
+    barrel.rotation.x = Math.PI / 2;
+    barrel.material = gunMetalMat;
+    barrel.parent = gunRoot;
+    barrel.position = new Vector3(0, 0.02, 0.82);
 
-// -----------------------------
-// Barrel energy core
-// -----------------------------
+    // -----------------------------
+    // Barrel energy core
+    // -----------------------------
 
-const energyCore = MeshBuilder.CreateCylinder(
-    "energyCore",
-    {
-        diameter: 0.07,
-        height: 0.60,
-        tessellation: 12
-    },
-    scene
-);
+    const energyCore = MeshBuilder.CreateCylinder(
+        "energyCore",
+        {
+            diameter: 0.07,
+            height: 0.60,
+            tessellation: 12
+        },
+        scene
+    );
 
-energyCore.rotation.x = Math.PI / 2;
-energyCore.material = gunEnergyMat;
-energyCore.parent = gunRoot;
-energyCore.position = new Vector3(0, 0.02, 0.85);
+    energyCore.rotation.x = Math.PI / 2;
+    energyCore.material = gunEnergyMat;
+    energyCore.parent = gunRoot;
+    energyCore.position = new Vector3(0, 0.02, 0.85);
 
-// -----------------------------
-// Grip
-// -----------------------------
+    // -----------------------------
+    // Grip
+    // -----------------------------
 
-const grip = MeshBuilder.CreateBox(
-    "grip",
-    {
-        width: 0.28,
-        height: 0.65,
-        depth: 0.35
-    },
-    scene
-);
+    const grip = MeshBuilder.CreateBox(
+        "grip",
+        {
+            width: 0.28,
+            height: 0.65,
+            depth: 0.35
+        },
+        scene
+    );
 
-grip.material = gunBodyMat;
-grip.parent = gunRoot;
-grip.position = new Vector3(0, -0.42, -0.15);
+    grip.material = gunBodyMat;
+    grip.parent = gunRoot;
+    grip.position = new Vector3(0, -0.42, -0.15);
 
-// Slight backward angle
-grip.rotation.z = -0.15;
+    // Slight backward angle
+    grip.rotation.z = -0.15;
 
-// -----------------------------
-// Trigger guard
-// -----------------------------
+    // -----------------------------
+    // Trigger guard
+    // -----------------------------
 
-const triggerGuard = MeshBuilder.CreateBox(
-    "triggerGuard",
-    {
-        width: 0.30,
-        height: 0.08,
-        depth: 0.25
-    },
-    scene
-);
+    const triggerGuard = MeshBuilder.CreateBox(
+        "triggerGuard",
+        {
+            width: 0.30,
+            height: 0.08,
+            depth: 0.25
+        },
+        scene
+    );
 
-triggerGuard.material = gunMetalMat;
-triggerGuard.parent = gunRoot;
-triggerGuard.position = new Vector3(0, -0.18, 0.05);
+    triggerGuard.material = gunMetalMat;
+    triggerGuard.parent = gunRoot;
+    triggerGuard.position = new Vector3(0, -0.18, 0.05);
 
-// -----------------------------
-// Side energy panel
-// -----------------------------
+    // -----------------------------
+    // Side energy panel
+    // -----------------------------
 
-const sidePanel = MeshBuilder.CreateBox(
-    "sidePanel",
-    {
-        width: 0.04,
-        height: 0.16,
-        depth: 0.45
-    },
-    scene
-);
+    const sidePanel = MeshBuilder.CreateBox(
+        "sidePanel",
+        {
+            width: 0.04,
+            height: 0.16,
+            depth: 0.45
+        },
+        scene
+    );
 
-sidePanel.material = gunEnergyMat;
-sidePanel.parent = gunRoot;
-sidePanel.position = new Vector3(0.24, 0.05, 0);
+    sidePanel.material = gunEnergyMat;
+    sidePanel.parent = gunRoot;
+    sidePanel.position = new Vector3(0.24, 0.05, 0);
 
-// -----------------------------
-// Attach gun to FPS camera
-// -----------------------------
+    // -----------------------------
+    // Attach gun to FPS camera
+    // -----------------------------
 
-gunRoot.position = new Vector3(0.55, -0.45, 1.1);
-gunRoot.rotation = new Vector3(0, 0, 0);
-gunRoot.scaling = new Vector3(0.75, 0.75, 0.75);
+    gunRoot.position = new Vector3(0.55, -0.45, 1.1);
+    gunRoot.rotation = new Vector3(0, 0, 0);
+    gunRoot.scaling = new Vector3(0.75, 0.75, 0.75);
 
-// Don't let gun interfere with shooting raycast
-[
-    gunBody,
-    upperRail,
-    barrel,
-    energyCore,
-    grip,
-    triggerGuard,
-    sidePanel
-].forEach(mesh => {
-    mesh.isPickable = false;
-});
+    // Don't let gun interfere with shooting raycast
+    [
+        gunBody,
+        upperRail,
+        barrel,
+        energyCore,
+        grip,
+        triggerGuard,
+        sidePanel
+    ].forEach(mesh => {
+        mesh.isPickable = false;
+    });
 
-let isDead = false;
-let matchEnded = false;
+    // ============================================================
+    // LOCAL PLAYER CHARACTER MESH (FOR 3RD PERSON VIEW)
+    // ============================================================
+    const localPlayerRoot = new TransformNode("localPlayerRoot", scene);
+
+    // Body capsule
+    const localPlayerBody = MeshBuilder.CreateCapsule("local_player_body", { height: 1.8, radius: 0.45 }, scene);
+    localPlayerBody.parent = localPlayerRoot;
+    localPlayerBody.position.set(0, 0.9, 0);
+    const localBodyMat = new StandardMaterial("localBodyMat", scene);
+    localBodyMat.diffuseColor = new Color3(0.12, 0.45, 0.85); // Vibrant cyan/blue armor
+    localBodyMat.specularColor = new Color3(0.5, 0.5, 0.5);
+    localPlayerBody.material = localBodyMat;
+
+    // Head sphere
+    const localPlayerHead = MeshBuilder.CreateSphere("local_player_head", { diameter: 0.65 }, scene);
+    localPlayerHead.parent = localPlayerRoot;
+    localPlayerHead.position.set(0, 1.9, 0);
+    const localHeadMat = new StandardMaterial("localHeadMat", scene);
+    localHeadMat.diffuseColor = new Color3(0.20, 0.55, 0.95);
+    localPlayerHead.material = localHeadMat;
+
+    // Glowing Sci-fi Visor
+    const localPlayerVisor = MeshBuilder.CreateBox("local_player_visor", { width: 0.45, height: 0.16, depth: 0.35 }, scene);
+    localPlayerVisor.parent = localPlayerRoot;
+    localPlayerVisor.position.set(0, 1.95, 0.22);
+    const localVisorMat = new StandardMaterial("localVisorMat", scene);
+    localVisorMat.diffuseColor = new Color3(0.0, 0.9, 1.0);
+    localVisorMat.emissiveColor = new Color3(0.0, 0.7, 1.0);
+    localPlayerVisor.material = localVisorMat;
+
+    // Shoulder Armor Pads
+    const shoulderL = MeshBuilder.CreateBox("local_player_shL", { width: 0.25, height: 0.3, depth: 0.4 }, scene);
+    shoulderL.parent = localPlayerRoot;
+    shoulderL.position.set(-0.52, 1.45, 0);
+    shoulderL.material = localBodyMat;
+
+    const shoulderR = MeshBuilder.CreateBox("local_player_shR", { width: 0.25, height: 0.3, depth: 0.4 }, scene);
+    shoulderR.parent = localPlayerRoot;
+    shoulderR.position.set(0.52, 1.45, 0);
+    shoulderR.material = localBodyMat;
+
+    const localPlayerMeshes = [localPlayerBody, localPlayerHead, localPlayerVisor, shoulderL, shoulderR];
+    localPlayerMeshes.forEach(m => {
+        m.isPickable = false;
+        m.checkCollisions = false;
+    });
+
+    // Camera mode & view toggle
+    let isThirdPerson = true; // Default view is 3rd Person
+
+    const viewBtn = document.createElement("button");
+    viewBtn.id = "cam-view-toggle-btn";
+    viewBtn.innerHTML = "Press [V] to change view";
+    viewBtn.style.position = "fixed";
+    viewBtn.style.top = "15px";
+    viewBtn.style.right = "300px";
+    viewBtn.style.zIndex = "1000";
+    viewBtn.style.padding = "8px 14px";
+    viewBtn.style.backgroundColor = "rgba(121, 119, 125, 0.35)";
+    viewBtn.style.color = "white";
+    viewBtn.style.border = "1.5px solid white";
+    viewBtn.style.borderRadius = "8px";
+    viewBtn.style.fontFamily = "rajdhani";
+    viewBtn.style.fontWeight = "bold";
+    viewBtn.style.fontSize = "13px";
+    viewBtn.style.cursor = "pointer";
+    viewBtn.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.3)";
+    document.body.appendChild(viewBtn);
+
+    function toggleViewMode() {
+        isThirdPerson = !isThirdPerson;
+        viewBtn.innerHTML = isThirdPerson ? "Press [V] to change view" : "Press [V] to change view";
+        viewBtn.style.color = isThirdPerson ? "#c9e4efff" : "#c9e4efff";
+        viewBtn.style.borderColor = isThirdPerson ? "#c9e4efff" : "#c9e4efff";
+    }
+
+    viewBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        toggleViewMode();
+    });
+
+    let isDead = false;
+    let matchEnded = false;
 
 
-const healthFill = document.getElementById("health-fill") as HTMLDivElement;
-const healthText = document.getElementById("health-text") as HTMLSpanElement;
-const deathScreen = document.getElementById("death-screen") as HTMLDivElement;
-const winScreen = document.getElementById("win-screen") as HTMLDivElement;
-    const respawnBtn  = document.getElementById("respawn-btn")  as HTMLButtonElement;
+    const healthFill = document.getElementById("health-fill") as HTMLDivElement;
+    const healthText = document.getElementById("health-text") as HTMLSpanElement;
+    const deathScreen = document.getElementById("death-screen") as HTMLDivElement;
+    const winScreen = document.getElementById("win-screen") as HTMLDivElement;
+    const respawnBtn = document.getElementById("respawn-btn") as HTMLButtonElement;
     const leaderboardEl = document.getElementById("leaderboard-list") as HTMLOListElement;
     const deathWinnerList = document.getElementById("death-winner-list") as HTMLDivElement;
 
     function updateHealthUI() {
-    const percentage = Math.max(0, (currentHealth / maxHealth) * 100);
+        const percentage = Math.max(0, (currentHealth / maxHealth) * 100);
 
-    if (healthFill) {
-        healthFill.style.width = percentage + "%";
+        if (healthFill) {
+            healthFill.style.width = percentage + "%";
 
-        if (percentage > 60) {
-            healthFill.style.backgroundColor = "green";
-        } else if (percentage > 30) {
-            healthFill.style.backgroundColor = "yellow";
-        } else {
-            healthFill.style.backgroundColor = "red";
+            if (percentage > 60) {
+                healthFill.style.backgroundColor = "green";
+            } else if (percentage > 30) {
+                healthFill.style.backgroundColor = "yellow";
+            } else {
+                healthFill.style.backgroundColor = "red";
+            }
+        }
+
+        if (healthText) {
+            healthText.textContent = Math.round(percentage) + "%";
         }
     }
 
-    if (healthText) {
-        healthText.textContent = Math.round(percentage) + "%";
-    }
-}
-    
 
     // ── Called by network.ts when the server says we took damage ──────────────
     onDamaged((health: number, _attackerId: string) => {
@@ -338,52 +421,52 @@ const winScreen = document.getElementById("win-screen") as HTMLDivElement;
     });
 
 
-onMatchEnded((winnerId: string, winnerName: string) => {
-    const myId = getMyId();
+    onMatchEnded((winnerId: string, winnerName: string) => {
+        const myId = getMyId();
 
-    matchEnded = true;
-    isDead = true;
+        matchEnded = true;
+        isDead = true;
 
-    const resultIcon = document.getElementById("match-result-icon");
-    const resultTitle = document.getElementById("match-result-title");
-    const resultWinner = document.getElementById("match-result-winner");
+        const resultIcon = document.getElementById("match-result-icon");
+        const resultTitle = document.getElementById("match-result-title");
+        const resultWinner = document.getElementById("match-result-winner");
 
-    if (winScreen) {
-        winScreen.style.display = "flex";
-    }
-
-    if (winnerId === myId) {
-        // 🏆 WE WON
-        if (resultIcon) {
-            resultIcon.innerText = "🏆";
+        if (winScreen) {
+            winScreen.style.display = "flex";
         }
 
-        if (resultTitle) {
-            resultTitle.innerText = "YOU WIN!";
+        if (winnerId === myId) {
+            // 🏆 WE WON
+            if (resultIcon) {
+                resultIcon.innerText = "🏆";
+            }
+
+            if (resultTitle) {
+                resultTitle.innerText = "YOU WIN!";
+            }
+
+            if (resultWinner) {
+                resultWinner.innerText = `Winner: ${winnerName}`;
+            }
+        } else {
+
+            if (resultIcon) {
+                resultIcon.innerText = "💀";
+            }
+
+            if (resultTitle) {
+                resultTitle.innerText = "YOU LOSE!";
+            }
+
+            if (resultWinner) {
+                resultWinner.innerText = `Winner: ${winnerName}`;
+            }
         }
 
-        if (resultWinner) {
-            resultWinner.innerText = `Winner: ${winnerName}`;
+        if (!isMobile) {
+            document.exitPointerLock?.();
         }
-    } else {
-        
-        if (resultIcon) {
-            resultIcon.innerText = "💀";
-        }
-
-        if (resultTitle) {
-            resultTitle.innerText = "YOU LOSE!";
-        }
-
-        if (resultWinner) {
-            resultWinner.innerText = `Winner: ${winnerName}`;
-        }
-    }
-
-    if (!isMobile) {
-        document.exitPointerLock?.();
-    }
-});
+    });
 
     // ── Called by network.ts when the server respawns us ─────────────────────
     onRespawned((x: number, y: number, z: number) => {
@@ -394,36 +477,36 @@ onMatchEnded((winnerId: string, winnerName: string) => {
         camera.position = new Vector3(x, y, z);
         if (matchEnded) return;
         camera.cameraDirection = new Vector3(0, 0, 0);
-        canJump   = true;
+        canJump = true;
         hasPeaked = false;
     });
 
     // ── Called by network.ts when the leaderboard changes ───────────────────
     // ── Leaderboard ─────────────────────────────────────────────────────────
-onLeaderboard((entries: LeaderboardEntry[]) => {
+    onLeaderboard((entries: LeaderboardEntry[]) => {
 
-    // ============================================================
-    // NORMAL GAME LEADERBOARD
-    // ============================================================
+        // ============================================================
+        // NORMAL GAME LEADERBOARD
+        // ============================================================
 
-    if (leaderboardEl) {
+        if (leaderboardEl) {
 
-        leaderboardEl.innerHTML = entries.map((e, i) => {
+            leaderboardEl.innerHTML = entries.map((e, i) => {
 
-            const isMe = e.id === getMyId();
+                const isMe = e.id === getMyId();
 
-            const medal =
-                i === 0 ? "🥇" :
-                i === 1 ? "🥈" :
-                i === 2 ? "🥉" :
-                `${i + 1}.`;
+                const medal =
+                    i === 0 ? "🥇" :
+                        i === 1 ? "🥈" :
+                            i === 2 ? "🥉" :
+                                `${i + 1}.`;
 
-            const displayName =
-                isMe
-                    ? `YOU (${getLocalPlayerName()})`
-                    : e.name;
+                const displayName =
+                    isMe
+                        ? `YOU (${getLocalPlayerName()})`
+                        : e.name;
 
-            return `
+                return `
                 <li class="lb-row${isMe ? " lb-me" : ""}">
 
                     <span class="lb-rank">
@@ -444,38 +527,38 @@ onLeaderboard((entries: LeaderboardEntry[]) => {
 
                 </li>
             `;
-        }).join("");
-    }
+            }).join("");
+        }
 
 
-    
-    // WINNER LIST ON DEATH SCREEN
-    
-    if (deathWinnerList) {
 
-        // Show only TOP 3 players
-        const winners = entries.slice(0, 3);
+        // WINNER LIST ON DEATH SCREEN
 
-        deathWinnerList.innerHTML = winners.map((e, i) => {
+        if (deathWinnerList) {
 
-            const isMe = e.id === getMyId();
+            // Show only TOP 3 players
+            const winners = entries.slice(0, 3);
 
-            const medal =
-                i === 0 ? "🥇" :
-                i === 1 ? "🥈" :
-                "🥉";
+            deathWinnerList.innerHTML = winners.map((e, i) => {
 
-            const position =
-                i === 0 ? "1ST" :
-                i === 1 ? "2ND" :
-                "3RD";
+                const isMe = e.id === getMyId();
 
-            const displayName =
-                isMe
-                    ? `YOU (${getLocalPlayerName()})`
-                    : e.name;
+                const medal =
+                    i === 0 ? "🥇" :
+                        i === 1 ? "🥈" :
+                            "🥉";
 
-            return `
+                const position =
+                    i === 0 ? "1ST" :
+                        i === 1 ? "2ND" :
+                            "3RD";
+
+                const displayName =
+                    isMe
+                        ? `YOU (${getLocalPlayerName()})`
+                        : e.name;
+
+                return `
                 <div class="death-winner-row">
 
                     <div class="winner-position">
@@ -503,9 +586,9 @@ onLeaderboard((entries: LeaderboardEntry[]) => {
                 </div>
             `;
 
-        }).join("");
-    }
-});
+            }).join("");
+        }
+    });
 
     // Local damage (e.g. fall damage) — also tells the server via player:hit
     function takeDamageLocal(amount: number) {
@@ -537,27 +620,86 @@ onLeaderboard((entries: LeaderboardEntry[]) => {
             updateHealthUI();
             camera.position = spawnPoint.clone();
             camera.cameraDirection = new Vector3(0, 0, 0);
-            canJump   = true;
+            canJump = true;
             hasPeaked = false;
-            isDead    = false;
+            isDead = false;
         });
     }
 
-   
+
 
     const JUMP_FORCE = 2; // single upward impulse injected into cameraDirection.y
-    let canJump   = true;     // whether the player is allowed to jump
+    let canJump = true;     // whether the player is allowed to jump
     let hasPeaked = false;    // true once the player has visibly started falling
     let prevY = spawnPoint.y;
 
     // ── Mobile setup ─────────────────────────────────────────────────────────
     setupMobileControls();
 
-    scene.onBeforeRenderObservable.add(() => {
-        if (isDead) return;
+    const realPlayerPos = new Vector3();
 
-        const currentY = camera.position.y;
-        const deltaY   = currentY - prevY;
+    scene.onBeforeRenderObservable.add(() => {
+        if (isDead) {
+            localPlayerMeshes.forEach(m => m.isVisible = false);
+            return;
+        }
+
+        // 1. Capture real physical player position before frame rendering
+        realPlayerPos.copyFrom(camera.position);
+
+        // 2. Position local 3D character mesh at physical location
+        localPlayerRoot.position.copyFrom(realPlayerPos).addInPlace(new Vector3(0, -0.9, 0));
+        localPlayerRoot.rotation.y = camera.rotation.y;
+
+        // 3. Update view-dependent gun & camera spring-arm positioning
+        if (isThirdPerson) {
+            localPlayerMeshes.forEach(m => m.isVisible = true);
+            gunRoot.parent = localPlayerRoot;
+            gunRoot.position.set(0.38, 1.05, 0.35);
+            gunRoot.rotation.set(0, 0, 0);
+            gunRoot.scaling.set(0.65, 0.65, 0.65);
+
+            // Compute over-the-shoulder third person camera location
+            const targetHead = realPlayerPos.add(new Vector3(0, 0.6, 0));
+            const yaw = camera.rotation.y;
+            const pitch = Math.max(-0.6, Math.min(0.8, camera.rotation.x));
+            const dist = 3.8;
+            const rightOffset = 0.55;
+
+            const cosP = Math.cos(pitch);
+            const sinP = Math.sin(pitch);
+            const sinY = Math.sin(yaw);
+            const cosY = Math.cos(yaw);
+
+            const offsetX = -sinY * cosP * dist + cosY * rightOffset;
+            const offsetY = sinP * dist + 0.5;
+            const offsetZ = -cosY * cosP * dist - sinY * rightOffset;
+
+            const desiredCamPos = targetHead.add(new Vector3(offsetX, offsetY, offsetZ));
+
+            // Camera wall collision prevention raycast
+            const rayDir = desiredCamPos.subtract(targetHead);
+            const rayLen = rayDir.length();
+            if (rayLen > 0.001) {
+                const normDir = rayDir.scale(1 / rayLen);
+                const ray = new Ray(targetHead, normDir, rayLen);
+                const pick = scene.pickWithRay(ray, (m) => m.checkCollisions && m.name !== "ground");
+                if (pick && pick.hit && pick.pickedPoint) {
+                    desiredCamPos.copyFrom(pick.pickedPoint.subtract(normDir.scale(0.2)));
+                }
+            }
+
+            camera.position.copyFrom(desiredCamPos);
+        } else {
+            localPlayerMeshes.forEach(m => m.isVisible = false);
+            gunRoot.parent = camera;
+            gunRoot.position.set(0.55, -0.45, 1.1);
+            gunRoot.rotation.set(0, 0, 0);
+            gunRoot.scaling.set(0.75, 0.75, 0.75);
+        }
+
+        const currentY = realPlayerPos.y;
+        const deltaY = currentY - prevY;
         prevY = currentY;
 
         if (!canJump) {
@@ -567,13 +709,13 @@ onLeaderboard((entries: LeaderboardEntry[]) => {
             }
             // Phase B: once genuinely falling, detect landing (fall stops)
             if (hasPeaked && deltaY >= -0.005) {
-                canJump   = true;
+                canJump = true;
                 hasPeaked = false;
             }
         }
 
         // Fell off the map
-        if (camera.position.y < -10) {
+        if (realPlayerPos.y < -10) {
             takeDamageLocal(100);
         }
 
@@ -593,17 +735,17 @@ onLeaderboard((entries: LeaderboardEntry[]) => {
             if (mob.moveX !== 0 || mob.moveZ !== 0) {
                 const yaw = camera.rotation.y;
                 const speed = camera.speed;
-                const fwdX  = Math.sin(yaw) * mob.moveZ * speed;
-                const fwdZ  = Math.cos(yaw) * mob.moveZ * speed;
-                const strX  = Math.cos(yaw) * mob.moveX * speed;
-                const strZ  =-Math.sin(yaw) * mob.moveX * speed;
+                const fwdX = Math.sin(yaw) * mob.moveZ * speed;
+                const fwdZ = Math.cos(yaw) * mob.moveZ * speed;
+                const strX = Math.cos(yaw) * mob.moveX * speed;
+                const strZ = -Math.sin(yaw) * mob.moveX * speed;
                 camera.cameraDirection.x += fwdX + strX;
                 camera.cameraDirection.z += fwdZ + strZ;
             }
 
             // Jump
             if (mob.jumpPressed && canJump) {
-                canJump   = false;
+                canJump = false;
                 hasPeaked = false;
                 camera.cameraDirection.y = JUMP_FORCE;
             }
@@ -618,11 +760,18 @@ onLeaderboard((entries: LeaderboardEntry[]) => {
 
         // ── Send position to server every frame (network.ts throttles to 20Hz) ──
         sendMove(
-            camera.position.x,
-            camera.position.y,
-            camera.position.z,
+            realPlayerPos.x,
+            realPlayerPos.y,
+            realPlayerPos.z,
             camera.rotation.y,
         );
+    });
+
+    scene.onAfterRenderObservable.add(() => {
+        if (isThirdPerson && !isDead) {
+            // Restore true physical position so input engine processes deltas correctly
+            camera.position.copyFrom(realPlayerPos);
+        }
     });
 
     // ── Desktop keyboard controls ─────────────────────────────────────────────
@@ -630,10 +779,15 @@ onLeaderboard((entries: LeaderboardEntry[]) => {
         if (isDead) return;
 
         if (e.code === "Space" && canJump) {
-            canJump   = false;
+            canJump = false;
             hasPeaked = false;
             // Single impulse — BabylonJS gravity + inertia handles the rest
             camera.cameraDirection.y = JUMP_FORCE;
+        }
+
+        // View mode toggle
+        if (e.code === "KeyV") {
+            toggleViewMode();
         }
 
         // Press 'H' to test local damage
@@ -671,7 +825,7 @@ function shoot(scene: Scene, canvas: HTMLCanvasElement) {
     });
 
 
-    
+
 
     const pickInfo = scene.pick(canvas.width / 2, canvas.height / 2);
 
@@ -694,11 +848,11 @@ function shoot(scene: Scene, canvas: HTMLCanvasElement) {
         if (meshName.startsWith("crate") && pickInfo.pickedMesh.material) {
             const mat = pickInfo.pickedMesh.material as StandardMaterial;
             const originalColor = mat.diffuseColor;
-            
-            mat.diffuseColor = new Color3(1, 1, 1); 
-            
-            setTimeout(() => { 
-                mat.diffuseColor = originalColor; 
+
+            mat.diffuseColor = new Color3(1, 1, 1);
+
+            setTimeout(() => {
+                mat.diffuseColor = originalColor;
             }, 100);
         }
 
