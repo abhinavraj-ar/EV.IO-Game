@@ -436,12 +436,10 @@ void main(void) {
         rpCap.checkCollisions = false; rpCap.isPickable = false; rpCap.material = lpBm;
 
         //  Overhead arch beam ("BIT SINDRI" signboard)
-        // Beam starts at top of pillars and spans the full opening
-        // Player height ≈ 2 units — beam bottom is at 7.5, well above player
-        const beamSpan = (GATE_GAP + PILLAR_W / 2) * 2 + PILLAR_W; // full span pillar-to-pillar
+        const beamSpan = (GATE_GAP + PILLAR_W / 2) * 2 + PILLAR_W;
         const beam = MeshBuilder.CreateBox("gate_beam", { width: beamSpan, height: 2.0, depth: PILLAR_D }, scene);
         beam.position.set(0, PILLAR_H + 1.25, GATE_Z);
-        beam.checkCollisions = true; // solid sign board
+        beam.checkCollisions = true;
         beam.isPickable = false;
         const beamMat = new StandardMaterial("gate_beamMat", scene);
         beamMat.diffuseColor = woodBrown;
@@ -452,21 +450,8 @@ void main(void) {
         beamCap.position.set(0, PILLAR_H + 2.42, GATE_Z);
         beamCap.checkCollisions = false; beamCap.isPickable = false; beamCap.material = lpBm;
 
-        //  Guard booth (cylindrical, left of gate) 
-        const booth = MeshBuilder.CreateCylinder("gate_booth", { diameter: 2.4, height: 3.5, tessellation: 12 }, scene);
-        booth.position.set(-(GATE_GAP + PILLAR_W + 3.5), 1.75, GATE_Z);
-        booth.checkCollisions = true; booth.isPickable = false;
-        const boothMat = new StandardMaterial("gate_boothMat", scene);
-        boothMat.diffuseColor = woodBrown;
-        booth.material = boothMat;
-        // Booth roof
-        const boothRoof = MeshBuilder.CreateCylinder("gate_boothRoof", { diameter: 2.8, height: 0.35, tessellation: 12 }, scene);
-        boothRoof.position.set(-(GATE_GAP + PILLAR_W + 3.5), 3.67, GATE_Z);
-        boothRoof.checkCollisions = false; boothRoof.isPickable = false;
-        const brm = new StandardMaterial("gate_brm", scene); brm.diffuseColor = whiteBase; boothRoof.material = brm;
-
         // -- Iron fence panels -- stop at pillar edges, opening left clear --
-        const fenceStartX = GATE_GAP + PILLAR_W + 0.5; // start outside the right pillar
+        const fenceStartX = GATE_GAP + PILLAR_W + 0.5;
         for (let fx = fenceStartX; fx <= 20; fx += 2) {
             const post = MeshBuilder.CreateBox(`gate_fence_R_${fx}`, { width: 0.22, height: 2.5, depth: 0.22 }, scene);
             post.position.set(fx, 1.25, GATE_Z);
@@ -573,9 +558,7 @@ void main(void) {
         [-26,  18, 5, 3.0], [ 26,  18, 5, 3.0],
         [-30,  30, 4, 2.5], [ 30,  30, 4, 2.5],
         [-22,   8, 5, 2.8], [ 22,   8, 5, 2.8],
-        // Between buildings
-        [-20, -18, 5, 2.5], [ 20, -18, 5, 2.5],
-        [ -8, -20, 4, 2.2], [  8, -20, 4, 2.2],
+        
         // West campus
         [-50,  -8, 6, 3.5], [-50,  10, 6, 3.5],
         [-50,  28, 5, 3.0], [-50, -28, 5, 3.0],
