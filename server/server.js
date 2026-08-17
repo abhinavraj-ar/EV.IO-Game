@@ -40,7 +40,7 @@ let spawnIndex = 0;
 
 const POINTS_PER_KILL = 10;
 
-const KILLS_TO_WIN = 2;
+const KILLS_TO_WIN = 5;
 
 
 function getNextSpawn() {
@@ -182,7 +182,6 @@ io.on("connection", (socket) => {
         const player = players.get(id);
         if (!player || player.isDead) return;
 
-        // Relay the shot direction so others can render a bullet trail
         socket.broadcast.emit("player:shot", {
             id,
             dirX: data.dirX,
@@ -210,59 +209,69 @@ io.on("connection", (socket) => {
             attackerId: id,
         });
 
-        if (target.health <= 0 && !target.isDead) {
-            target.isDead = true;
-            target.deaths++;
-            attacker.kills++;
 
-            
+
+if (target.health <= 0 && !target.isDead) {
+    target.isDead = true;
+    target.deaths++;
+    attacker.kills++;
+
+    console.log(
+        `[!] ${attacker.name} killed ${target.name} | ` +
+        `K:${attacker.kills} (${attacker.kills * POINTS_PER_KILL}pts)`
+    );
+
+    // Tell everyone that the player died
+    io.emit("player:died", {
+        id: target.id,
+        killerId: attacker.id,
+    });
+
+    // IMPORTANT: update leaderboard after EVERY kill
+    broadcastLeaderboard();
+
+    // Check whether this kill wins the match
+    if (attacker.kills >= KILLS_TO_WIN) {
+        // console.log(`[🏆] ${attacker.name} WON THE MATCH!`);
+
+
+        console.log(
+    `[🏆] ${attacker.name} WON THE MATCH with ${attacker.kills * POINTS_PER_KILL} POINTS!`
+);
+
+        io.emit("match:ended", {
+            winnerId: attacker.id,
+            winnerName: attacker.name,
+        });
+
+        return;
+    }
+
+    // Respawn after 3 seconds
+    setTimeout(() => {
+        if (!players.has(target.id)) return;
+
+        const spawn = getNextSpawn();
+
+        target.x = spawn.x;
+        target.y = spawn.y;
+        target.z = spawn.z;
+        target.health = MAX_HEALTH;
+        target.isDead = false;
+
+        io.emit("player:respawned", {
+            id: target.id,
+            x: target.x,
+            y: target.y,
+            z: target.z,
+            health: target.health,
+        });
+
+        console.log(`[~] ${target.name} respawned`);
+    }, 3000);
 }
 
-            console.log(`[!] ${id} killed ${target.id}  | K:${attacker.kills} (${attacker.kills * POINTS_PER_KILL}pts)`);
-
-            if (attacker.kills >= KILLS_TO_WIN) {
-    console.log(`[🏆] ${attacker.name} WON THE MATCH!`);
-
-    io.emit("match:ended", {
-        winnerId: attacker.id,
-        winnerName: attacker.name,
-    });
-
-
-    
-
-
-            // Notify everyone of the kill
-            io.emit("player:died", {
-                id:       target.id,
-                killerId: id,
-            });
-
-            // Broadcast updated leaderboard to all clients
-            broadcastLeaderboard();
-
-            // Auto-respawn after 3 seconds
-            setTimeout(() => {
-                if (!players.has(target.id)) return; // player disconnected meanwhile
-
-                const spawn = getNextSpawn();
-                target.x      = spawn.x;
-                target.y      = spawn.y;
-                target.z      = spawn.z;
-                target.health = MAX_HEALTH;
-                target.isDead = false;
-
-                io.emit("player:respawned", {
-                    id:     target.id,
-                    x:      target.x,
-                    y:      target.y,
-                    z:      target.z,
-                    health: target.health,
-                });
-                console.log(`[~] ${target.id} respawned`);
-            }, 3000);
-        }
-    });
+});
 
     // ── player:respawn (manual) ───────────────────────────
     socket.on("player:respawn", () => {
@@ -285,19 +294,19 @@ io.on("connection", (socket) => {
         });
     });
 
-    // ── disconnect ───────────────────────────────────────
+    // ── disconnect 
     socket.on("disconnect", (reason) => {
         players.delete(id);
         io.emit("player:left", { id });
         console.log(`[-] Player disconnected: ${id}  reason=${reason}  (total: ${players.size})`);
-        // Refresh leaderboard now that player is gone
+        
         broadcastLeaderboard();
     });
 });
 
-// ─────────────────────────────────────────────
+
 // Start
-// ─────────────────────────────────────────────
+
 server.listen(PORT, () => {
     console.log(`\n🎮  ev.io multiplayer server running on http://localhost:${PORT}`);
     console.log(`    Health check : GET /`);

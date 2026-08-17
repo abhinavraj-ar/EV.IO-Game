@@ -518,7 +518,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
                     </span>
 
                     <span class="lb-kills">
-                        ${e.kills}K
+                        ${e.kills}/5K
                     </span>
 
                     <span class="lb-pts">
