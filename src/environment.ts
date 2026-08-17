@@ -6,8 +6,11 @@ import {
     MeshBuilder,
     StandardMaterial,
     Color3,
+    Color4,
     Mesh,
     ShadowGenerator,
+    ShaderMaterial,
+    Effect,
 } from "@babylonjs/core";
 
 
@@ -33,6 +36,7 @@ const C = {
     fountainWtr: new Color3(0.28, 0.55, 0.70),
     stone:       new Color3(0.55, 0.52, 0.48),
 };
+
 
 // --- HELPERS -------------------------------------------------------------------------------
 
@@ -155,13 +159,161 @@ function tree(name: string, scene: Scene, x: number, z: number, h = 4, canopyR =
 // ------------------------------------------------------------------------------------
 export function createEnvironment(scene: Scene) {
 
+    // SCENE BACKDROP & FOG
+    scene.clearColor = new Color4(0.55, 0.75, 0.95, 1.0);
+    scene.fogMode = Scene.FOGMODE_EXP2;
+    scene.fogColor = new Color3(0.65, 0.78, 0.92);
+    scene.fogDensity = 0.003;
+
+    // PROCEDURAL SKY SHADER & SKYBOX
+    Effect.ShadersStore["skyVertexShader"] = `
+precision highp float;
+attribute vec3 position;
+attribute vec2 uv;
+uniform mat4 worldViewProjection;
+varying vec3 vPosition;
+varying vec2 vUV;
+
+void main(void) {
+    vPosition = position;
+    vUV = uv;
+    gl_Position = worldViewProjection * vec4(position, 1.0);
+}
+`;
+
+    Effect.ShadersStore["skyFragmentShader"] = `
+precision highp float;
+varying vec3 vPosition;
+varying vec2 vUV;
+
+uniform vec3 topColor;
+uniform vec3 bottomColor;
+uniform vec3 horizonColor;
+uniform vec3 sunColor;
+uniform vec3 sunDirection;
+uniform float time;
+
+float hash(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+
+float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+float fbm(vec2 p) {
+    float v = 0.0;
+    float a = 0.5;
+    mat2 rot = mat2(0.8, 0.6, -0.6, 0.8);
+    for (int i = 0; i < 4; ++i) {
+        v += a * noise(p);
+        p = rot * p * 2.0;
+        a *= 0.5;
+    }
+    return v;
+}
+
+void main(void) {
+    vec3 dir = normalize(vPosition);
+    
+    float h = dir.y;
+    
+    vec3 skyColor;
+    if (h > 0.0) {
+        float factor = pow(h, 0.45);
+        skyColor = mix(horizonColor, topColor, factor);
+    } else {
+        float factor = clamp(-h * 4.0, 0.0, 1.0);
+        skyColor = mix(horizonColor, bottomColor, factor);
+    }
+    
+    // Warm horizon glow
+    float horizonGlow = pow(1.0 - abs(dir.y), 4.0);
+    skyColor += vec3(0.95, 0.72, 0.50) * horizonGlow * 0.35;
+    
+    // Sun disc & solar atmosphere flare
+    vec3 sunDir = normalize(-sunDirection);
+    float sunDot = max(0.0, dot(dir, sunDir));
+    float sunDisc = smoothstep(0.9975, 0.9995, sunDot);
+    float sunGlow = pow(sunDot, 32.0) * 0.6 + pow(sunDot, 6.0) * 0.25;
+    skyColor += sunColor * (sunDisc * 3.5 + sunGlow);
+    
+    // Dynamic Procedural Clouds
+    if (dir.y > 0.01) {
+        vec2 cloudUV = dir.xz / (dir.y + 0.12) * 1.2 + vec2(time * 0.003, time * 0.001);
+        float cloudPattern = fbm(cloudUV);
+        float cloudMask = smoothstep(0.42, 0.75, cloudPattern) * pow(clamp(dir.y, 0.0, 1.0), 0.35);
+        
+        vec3 cloudColor = vec3(0.98, 0.99, 1.0);
+        float sunLit = max(0.0, dot(vec3(dir.x, 0.2, dir.z), sunDir));
+        cloudColor += sunColor * pow(sunLit, 4.0) * 0.3;
+        
+        skyColor = mix(skyColor, cloudColor, cloudMask * 0.75);
+    }
+    
+    gl_FragColor = vec4(skyColor, 1.0);
+}
+`;
+
+    const skyMaterial = new ShaderMaterial(
+        "skyShader",
+        scene,
+        {
+            vertex: "sky",
+            fragment: "sky",
+        },
+        {
+            attributes: ["position", "uv"],
+            uniforms: [
+                "worldViewProjection",
+                "topColor",
+                "bottomColor",
+                "horizonColor",
+                "sunColor",
+                "sunDirection",
+                "time",
+            ],
+        }
+    );
+
+    const sunVector = new Vector3(-0.6, -1.5, -1).normalize();
+
+    skyMaterial.backFaceCulling = false;
+    skyMaterial.setColor3("topColor", new Color3(0.12, 0.38, 0.82));     // Deep azure zenith
+    skyMaterial.setColor3("horizonColor", new Color3(0.60, 0.78, 0.95)); // Soft horizon blue
+    skyMaterial.setColor3("bottomColor", new Color3(0.22, 0.32, 0.14));  // Ground color blend
+    skyMaterial.setColor3("sunColor", new Color3(1.0, 0.95, 0.80));     // Warm sun glow
+    skyMaterial.setVector3("sunDirection", sunVector);
+    skyMaterial.setFloat("time", 0);
+
+    const skyBox = MeshBuilder.CreateBox("skyBox", { size: 1000.0 }, scene);
+    skyBox.material = skyMaterial;
+    skyBox.infiniteDistance = true;
+    skyBox.isPickable = false;
+    skyBox.checkCollisions = false;
+
+    let skyTime = 0;
+    scene.onBeforeRenderObservable.add(() => {
+        skyTime += 0.01;
+        skyMaterial.setFloat("time", skyTime);
+    });
+
     //  LIGHTING 
     const ambient = new HemisphericLight("sky", new Vector3(0, 1, 0), scene);
     ambient.intensity   = 0.60;
     ambient.diffuse     = new Color3(1.0, 0.97, 0.88);
     ambient.groundColor = new Color3(0.12, 0.10, 0.06);
 
-    const sun = new DirectionalLight("sun", new Vector3(-0.6, -1.5, -1).normalize(), scene);
+    const sun = new DirectionalLight("sun", sunVector, scene);
     sun.intensity = 1.15;
     sun.diffuse   = new Color3(1.0, 0.96, 0.82);
 
