@@ -658,542 +658,146 @@ body.is-mobile.landscape-small #action-buttons {
     justify-content: center;
     align-items: center;
 
-    overflow: hidden;
-
-    font-family: "Arial", "Helvetica", sans-serif;
-
     background:
-        radial-gradient(circle at 50% 45%,
-            rgba(0, 255, 170, 0.08),
-            transparent 32%),
-        radial-gradient(circle at 15% 20%,
-            rgba(0, 180, 255, 0.08),
-            transparent 28%),
-        radial-gradient(circle at 85% 80%,
-            rgba(0, 255, 130, 0.06),
-            transparent 30%),
-        #050809;
+        radial-gradient(circle at center,
+        rgba(40, 50, 70, 0.6),
+        rgba(0, 0, 0, 0.97));
 
-    color: white;
+    font-family: Arial, Helvetica, sans-serif;
 }
-
-
-/* ─────────────────────────────────────────
-   FUTURISTIC GRID
-   ───────────────────────────────────────── */
-
-#start-screen::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-
-    background-image:
-        linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
-
-    background-size: 45px 45px;
-
-    mask-image: radial-gradient(
-        ellipse at center,
-        black 20%,
-        transparent 80%
-    );
-
-    pointer-events: none;
-}
-
-
-/* ─────────────────────────────────────────
-   SCANLINE EFFECT
-   ───────────────────────────────────────── */
-
-#start-screen::after {
-    content: "";
-
-    position: absolute;
-    inset: 0;
-
-    background: repeating-linear-gradient(
-        to bottom,
-        transparent 0px,
-        transparent 3px,
-        rgba(255,255,255,0.012) 4px
-    );
-
-    pointer-events: none;
-}
-
-
-/* ─────────────────────────────────────────
-   MAIN PANEL
-   ───────────────────────────────────────── */
 
 #start-box {
-    position: relative;
+    width: 600px;
+    min-height: 430px;
 
-    width: 620px;
-    min-height: 450px;
-
-    padding: 60px 65px;
+    padding: 65px 60px;
 
     box-sizing: border-box;
 
     text-align: center;
 
-    background:
-        linear-gradient(
-            145deg,
-            rgba(18, 27, 27, 0.96),
-            rgba(7, 12, 13, 0.97)
-        );
+    background: rgba(8, 8, 8, 0.94);
 
-    border: 3px solid rgba(0, 255, 170, 0.28);
-
-    border-radius: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
 
     box-shadow:
-        0 0 0 1px rgba(255,255,255,0.03),
-        0 0 40px rgba(0,255,170,0.08),
-        0 30px 100px rgba(0,0,0,0.9),
-        inset 0 0 40px rgba(0,255,170,0.025);
-
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-
-    overflow: hidden;
+        0 0 60px rgba(0, 0, 0, 0.9),
+        inset 0 0 30px rgba(255, 255, 255, 0.04);
 }
 
-
-/* ─────────────────────────────────────────
-   PANEL CORNER ACCENTS
-   ───────────────────────────────────────── */
-
-#start-box::before,
-#start-box::after {
-    content: "";
-
-    position: absolute;
-
-    width: 70px;
-    height: 70px;
-
-    pointer-events: none;
-}
-
-#start-box::before {
-    top: 0;
-    left: 0;
-
-    border-top: 2px solid rgba(0,255,170,0.9);
-    border-left: 2px solid rgba(0,255,170,0.9);
-
-    border-top-left-radius: 18px;
-}
-
-#start-box::after {
-    right: 0;
-    bottom: 0;
-
-    border-right: 2px solid rgba(0,255,170,0.9);
-    border-bottom: 2px solid rgba(0,255,170,0.9);
-
-    border-bottom-right-radius: 18px;
-}
-
-
-/* ─────────────────────────────────────────
-   SMALL GAME STATUS
-   ───────────────────────────────────────── */
-
-#start-box .game-status {
-    margin-bottom: 15px;
-
-    color: #00ffb0;
-
-    font-size: 11px;
-    font-weight: bold;
-
-    letter-spacing: 5px;
-
-    text-transform: uppercase;
-
-    opacity: 0.8;
-}
-
-
-/* ─────────────────────────────────────────
-   GAME TITLE
-   ───────────────────────────────────────── */
+/* GAME TITLE */
 
 #start-box h1 {
-    position: relative;
+    margin: 0 0 25px;
 
-    margin: 0 0 22px;
-
-    font-size: 68px;
-    line-height: 0.95;
-
+    font-size: 85px;
     font-weight: 900;
 
-    letter-spacing: 9px;
+    letter-spacing: 10px;
 
-    color: #ffffff;
-
-    text-transform: uppercase;
+    color: white;
 
     text-shadow:
-        0 0 8px rgba(255,255,255,0.45),
-        0 0 25px rgba(0,255,170,0.22);
-
-    font-family:
-        "Arial Black",
-        "Arial",
-        sans-serif;
+        0 0 15px rgba(255, 255, 255, 0.6),
+        0 0 40px rgba(255, 255, 255, 0.3);
 }
 
-
-/* TITLE ACCENT */
-
-#start-box h1 span {
-    color: #00ffb0;
-
-    text-shadow:
-        0 0 10px rgba(0,255,176,0.7),
-        0 0 30px rgba(0,255,176,0.35);
-}
-
-
-/* ─────────────────────────────────────────
-   SUBTITLE / USERNAME TEXT
-   ───────────────────────────────────────── */
+/* ENTER USERNAME TEXT */
 
 #start-box p {
-    margin: 18px 0 25px;
+    margin: 15px 0 25px;
 
-    color: #8d9b9b;
+    color: #aaa;
 
-    font-size: 14px;
+    font-size: 18px;
 
     letter-spacing: 3px;
-
-    text-transform: uppercase;
 }
 
-
-/* ─────────────────────────────────────────
-   USERNAME INPUT
-   ───────────────────────────────────────── */
+/* USERNAME INPUT */
 
 #username-input {
     width: 100%;
-    height: 62px;
+    height: 65px;
 
     box-sizing: border-box;
 
     padding: 15px 20px;
 
-    margin-bottom: 18px;
+    margin-bottom: 25px;
 
-    background:
-        linear-gradient(
-            90deg,
-            rgba(255,255,255,0.025),
-            rgba(0,255,170,0.025)
-        );
+    background: #151515;
 
-    border: 1px solid rgba(255,255,255,0.14);
-
-    border-radius: 9px;
+    border: 2px solid #555;
+    border-radius: 10px;
 
     outline: none;
 
     color: white;
 
-    font-size: 19px;
-
-    font-weight: 500;
+    font-size: 22px;
 
     text-align: center;
-
-    letter-spacing: 2px;
-
-    transition:
-        border-color 0.25s ease,
-        box-shadow 0.25s ease,
-        background 0.25s ease;
 }
-
-
-#username-input:hover {
-    border-color: rgba(0,255,170,0.35);
-}
-
 
 #username-input:focus {
-    border-color: #00ffb0;
-
-    background:
-        rgba(0,255,170,0.035);
+    border-color: white;
 
     box-shadow:
-        0 0 0 2px rgba(0,255,170,0.06),
-        0 0 25px rgba(0,255,170,0.12);
+        0 0 15px rgba(255, 255, 255, 0.25);
 }
-
 
 #username-input::placeholder {
-    color: #596363;
-
-    letter-spacing: 2px;
+    color: #666;
 }
 
-
-/* ─────────────────────────────────────────
-   PLAY BUTTON
-   ───────────────────────────────────────── */
+/* PLAY BUTTON */
 
 #play-btn {
-    position: relative;
-
     width: 100%;
-    height: 62px;
+    height: 65px;
 
-    border: 1px solid rgba(0,255,176,0.7);
+    border: none;
+    border-radius: 10px;
 
-    border-radius: 9px;
+    background: white;
 
-    background:
-        linear-gradient(
-            135deg,
-            #00ffb0,
-            #00d98f
-        );
+    color: black;
 
-    color: #03110c;
+    font-size: 22px;
+    font-weight: bold;
 
-    font-size: 17px;
-
-    font-weight: 900;
-
-    letter-spacing: 5px;
+    letter-spacing: 4px;
 
     cursor: pointer;
 
-    overflow: hidden;
-
-    transition:
-        transform 0.2s ease,
-        box-shadow 0.2s ease,
-        filter 0.2s ease;
+    transition: 0.2s;
 }
-
-
-#play-btn::before {
-    content: "";
-
-    position: absolute;
-
-    top: 0;
-    left: -100%;
-
-    width: 60%;
-    height: 100%;
-
-    background:
-        linear-gradient(
-            90deg,
-            transparent,
-            rgba(255,255,255,0.35),
-            transparent
-        );
-
-    transform: skewX(-20deg);
-
-    transition: left 0.5s ease;
-}
-
 
 #play-btn:hover {
-    transform: translateY(-2px);
+    transform: scale(1.04);
 
-    filter: brightness(1.08);
+    background: #e5e5e5;
 
     box-shadow:
-        0 0 15px rgba(0,255,176,0.4),
-        0 0 40px rgba(0,255,176,0.18);
+        0 0 30px rgba(255, 255, 255, 0.4);
 }
-
-
-#play-btn:hover::before {
-    left: 140%;
-}
-
 
 #play-btn:active {
-    transform: translateY(1px) scale(0.99);
+    transform: scale(0.98);
 }
 
-
-/* ─────────────────────────────────────────
-   ERROR
-   ───────────────────────────────────────── */
+/* ERROR */
 
 #username-error {
     min-height: 20px;
 
-    margin-top: 15px !important;
+    margin-top: 20px !important;
 
-    color: #ff5c5c !important;
+    color: #ff5555 !important;
 
-    font-size: 12px !important;
+    font-size: 14px !important;
 
-    font-weight: 600;
-
-    letter-spacing: 1.5px !important;
-
-    text-transform: uppercase;
+    letter-spacing: 1px !important;
 }
-
-
-/* ─────────────────────────────────────────
-   RESPONSIVE
-   ───────────────────────────────────────── */
-
-@media (max-width: 700px) {
-
-    #start-box {
-        width: 90%;
-
-        min-height: auto;
-
-        padding: 45px 30px;
-    }
-
-    #start-box h1 {
-        font-size: 48px;
-
-        letter-spacing: 6px;
-    }
-
-    #username-input,
-    #play-btn {
-        height: 58px;
-    }
-}
-
-
-@media (max-height: 650px) {
-
-    #start-box {
-        padding: 35px 45px;
-
-        min-height: auto;
-    }
-
-    #start-box h1 {
-        font-size: 50px;
-
-        margin-bottom: 15px;
-    }
-
-    #start-box p {
-        margin: 10px 0 18px;
-    }
-}
-
-
-/* =========================================
-   MOVING NEON BORDER
-   ========================================= */
-
-#start-box {
-    isolation: isolate;
-}
-
-/* Moving light */
-#start-box::before {
-    content: "";
-
-    position: absolute;
-    inset: -2px;
-
-    border-radius: 20px;
-
-    padding: 2px;
-
-    background: conic-gradient(
-        from 0deg,
-        transparent 0deg,
-        transparent 300deg,
-        #00ffb0 330deg,
-        #ffffff 345deg,
-        #00ffb0 355deg,
-        transparent 360deg
-    );
-
-    animation: borderRotate 3s linear infinite;
-
-    /* Cut the center out */
-    -webkit-mask:
-        linear-gradient(#000 0 0) content-box,
-        linear-gradient(#000 0 0);
-
-    -webkit-mask-composite: xor;
-
-    mask:
-        linear-gradient(#000 0 0) content-box,
-        linear-gradient(#000 0 0);
-
-    mask-composite: exclude;
-
-    pointer-events: none;
-
-    z-index: 2;
-}
-
-
-/* Soft glow behind the moving line */
-#start-box::after {
-    content: "";
-
-    position: absolute;
-    inset: -5px;
-
-    border-radius: 23px;
-
-    background: conic-gradient(
-        from 0deg,
-        transparent 0deg,
-        transparent 300deg,
-        rgba(0,255,176,0.0) 320deg,
-        rgba(0,255,176,0.8) 345deg,
-        transparent 360deg
-    );
-
-    filter: blur(8px);
-
-    animation: borderRotate 3s linear infinite;
-
-    opacity: 0.6;
-
-    pointer-events: none;
-
-    z-index: -1;
-}
-
-
-
-
-@keyframes borderRotate {
-    from {
-        transform: rotate(0deg);
-    }
-
-    to {
-        transform: rotate(360deg);
-    }
-}
-
-
-
-
