@@ -63,6 +63,7 @@ import HavokPhysics from "@babylonjs/havok";
 import { createEnvironment } from "./environment";
 import { setupPlayer } from "./player";
 import { initNetwork } from "./network";
+import { loadGameAssets } from "./assetManager";
 
 
 // =====================================================
@@ -111,6 +112,8 @@ const createScene = async () => {
     );
 
     createEnvironment(scene);
+
+    await loadGameAssets(scene);
 
     setupPlayer(scene, canvas);
 
