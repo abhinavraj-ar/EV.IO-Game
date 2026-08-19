@@ -13,6 +13,7 @@ import {
     sendShoot,
     sendHit,
     sendRespawn,
+    sendPlayAgain,
     onDamaged,
     onDied,
     onRespawned,
@@ -86,13 +87,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     camera.ellipsoid = new Vector3(0.5, 1, 0.5);
     camera.ellipsoidOffset = new Vector3(0, 1, 0);
 
-    //The Gun Model
-    // 3D Gun Model
-
-
-
-    // Prevent shooting yourself
-
+    
 
 
 
@@ -100,9 +95,9 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     let maxHealth = 100;
     let currentHealth = maxHealth;
 
-    // =============================
+    
     // 3D SCI-FI GUN
-    // =============================
+    
 
     const gunRoot = new TransformNode("gunRoot", scene);
     gunRoot.parent = camera;
@@ -141,9 +136,9 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     gunBody.parent = gunRoot;
     gunBody.position = new Vector3(0, 0, 0);
 
-    // -----------------------------
+    
     // Upper rail
-    // -----------------------------
+    
 
     const upperRail = MeshBuilder.CreateBox(
         "upperRail",
@@ -159,9 +154,9 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     upperRail.parent = gunRoot;
     upperRail.position = new Vector3(0, 0.20, -0.05);
 
-    // -----------------------------
+    
     // Barrel
-    // -----------------------------
+    
 
     const barrel = MeshBuilder.CreateCylinder(
         "barrel",
@@ -178,10 +173,9 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     barrel.parent = gunRoot;
     barrel.position = new Vector3(0, 0.02, 0.82);
 
-    // -----------------------------
+    
     // Barrel energy core
-    // -----------------------------
-
+    
     const energyCore = MeshBuilder.CreateCylinder(
         "energyCore",
         {
@@ -197,9 +191,9 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     energyCore.parent = gunRoot;
     energyCore.position = new Vector3(0, 0.02, 0.85);
 
-    // -----------------------------
+   
     // Grip
-    // -----------------------------
+    
 
     const grip = MeshBuilder.CreateBox(
         "grip",
@@ -218,9 +212,9 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     // Slight backward angle
     grip.rotation.z = -0.15;
 
-    // -----------------------------
+    
     // Trigger guard
-    // -----------------------------
+    
 
     const triggerGuard = MeshBuilder.CreateBox(
         "triggerGuard",
@@ -365,9 +359,35 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     const healthText = document.getElementById("health-text") as HTMLSpanElement;
     const deathScreen = document.getElementById("death-screen") as HTMLDivElement;
     const winScreen = document.getElementById("win-screen") as HTMLDivElement;
+
+    const playAgainBtn = document.getElementById("play-again-btn") as HTMLButtonElement;
+
     const respawnBtn = document.getElementById("respawn-btn") as HTMLButtonElement;
     const leaderboardEl = document.getElementById("leaderboard-list") as HTMLOListElement;
     const deathWinnerList = document.getElementById("death-winner-list") as HTMLDivElement;
+
+    if (playAgainBtn) {
+    playAgainBtn.addEventListener("click", () => {
+        sendPlayAgain();
+
+        // Hide winner screen
+        if (winScreen) {
+            winScreen.style.display = "none";
+        }
+
+        // Reset local match state
+        matchEnded = false;
+        isDead = false;
+        currentHealth = maxHealth;
+
+        updateHealthUI();
+
+        // Lock mouse again on desktop
+        if (!isMobile && document.pointerLockElement !== canvas) {
+            canvas.requestPointerLock?.();
+        }
+    });
+}
 
     function updateHealthUI() {
         const percentage = Math.max(0, (currentHealth / maxHealth) * 100);
@@ -837,7 +857,7 @@ function shoot(scene: Scene, canvas: HTMLCanvasElement) {
         const remoteId = getRemotePlayerIdFromMesh(meshName);
         if (remoteId) {
             // 10 damage per shot — server validates and clamps
-            sendHit(remoteId, 10);
+            sendHit(remoteId, 20);
             // Emit the shot direction for bullet-trail effects
             const dir = pickInfo.ray?.direction;
             if (dir) sendShoot(dir.x, dir.y, dir.z);

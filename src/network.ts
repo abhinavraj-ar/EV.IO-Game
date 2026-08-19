@@ -163,6 +163,10 @@ export function sendRespawn() {
     socket?.emit("player:respawn");
 }
 
+export function sendPlayAgain() {
+    socket?.emit("player:playAgain");
+}
+
 /** Register a callback for when OUR player takes damage. */
 export function onDamaged(cb: OnDamagedCb)   { onDamagedCb  = cb; }
 
