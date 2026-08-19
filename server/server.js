@@ -271,7 +271,44 @@ if (target.health <= 0 && !target.isDead) {
     }, 3000);
 }
 
+});// ── player:playAgain ─────────────────────────────────
+socket.on("player:playAgain", () => {
+    console.log(`[🔄] ${players.get(id)?.name} requested a new match`);
+
+    // Reset all currently connected players
+    for (const player of players.values()) {
+        const spawn = getNextSpawn();
+
+        player.x = spawn.x;
+        player.y = spawn.y;
+        player.z = spawn.z;
+        player.health = MAX_HEALTH;
+        player.isDead = false;
+        player.kills = 0;
+        player.deaths = 0;
+    }
+
+    // Reset leaderboard to 0
+    broadcastLeaderboard();
+
+    // Tell all existing players to start the new match
+    io.emit("match:restarted");
+
+    // Send everyone their fresh position/health
+    for (const player of players.values()) {
+        io.emit("player:respawned", {
+            id: player.id,
+            x: player.x,
+            y: player.y,
+            z: player.z,
+            health: player.health,
+        });
+    }
 });
+
+
+
+
 
     // ── player:respawn (manual) ───────────────────────────
     socket.on("player:respawn", () => {

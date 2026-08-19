@@ -13,6 +13,7 @@ import {
     sendShoot,
     sendHit,
     sendRespawn,
+    sendPlayAgain,
     onDamaged,
     onDied,
     onRespawned,
@@ -98,18 +99,36 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     // =========================================================================
     // HEALTH & DEATH
     // =========================================================================
-    const maxHealth  = 100;
+    const maxHealth   = 100;
     let currentHealth = maxHealth;
     let isDead        = false;
     let matchEnded    = false;
 
-    const healthFill    = document.getElementById("health-fill")    as HTMLDivElement;
-    const healthText    = document.getElementById("health-text")     as HTMLSpanElement;
-    const deathScreen   = document.getElementById("death-screen")   as HTMLDivElement;
-    const winScreen     = document.getElementById("win-screen")      as HTMLDivElement;
-    const respawnBtn    = document.getElementById("respawn-btn")     as HTMLButtonElement;
-    const leaderboardEl = document.getElementById("leaderboard-list") as HTMLOListElement;
-    const deathWinnerList = document.getElementById("death-winner-list") as HTMLDivElement;
+    const healthFill     = document.getElementById("health-fill")      as HTMLDivElement;
+    const healthText     = document.getElementById("health-text")       as HTMLSpanElement;
+    const deathScreen    = document.getElementById("death-screen")      as HTMLDivElement;
+    const winScreen      = document.getElementById("win-screen")        as HTMLDivElement;
+    const respawnBtn     = document.getElementById("respawn-btn")       as HTMLButtonElement;
+    const leaderboardEl  = document.getElementById("leaderboard-list")  as HTMLOListElement;
+    const deathWinnerList= document.getElementById("death-winner-list") as HTMLDivElement;
+    const playAgainBtn   = document.getElementById("play-again-btn")    as HTMLButtonElement;
+
+    if (playAgainBtn) {
+        playAgainBtn.addEventListener("click", () => {
+            sendPlayAgain();
+
+            if (winScreen) winScreen.style.display = "none";
+
+            matchEnded    = false;
+            isDead        = false;
+            currentHealth = maxHealth;
+            updateHealthUI();
+
+            if (!isMobile && document.pointerLockElement !== canvas) {
+                canvas.requestPointerLock?.();
+            }
+        });
+    }
 
     function updateHealthUI() {
         const pct = Math.max(0, (currentHealth / maxHealth) * 100);
@@ -157,7 +176,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
         camera.position = new Vector3(x, y, z);
         if (matchEnded) return;
         camera.cameraDirection = Vector3.Zero();
-        canJump  = true;
+        canJump   = true;
         hasPeaked = false;
     });
 
@@ -222,9 +241,9 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
             updateHealthUI();
             camera.position           = spawnPoint.clone();
             camera.cameraDirection    = Vector3.Zero();
-            canJump  = true;
+            canJump   = true;
             hasPeaked = false;
-            isDead   = false;
+            isDead    = false;
         });
     }
 
@@ -272,12 +291,9 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
 
         if (localWalkAnim) {
             if (isMoving && !isWalkAnim) {
-                // Start fresh — guarantees the loop restarts cleanly.
-                // loop=true  speed=1.2  from=first-frame  to=last-frame
                 localWalkAnim.start(true, 1.2, localWalkAnim.from, localWalkAnim.to);
                 isWalkAnim = true;
             } else if (!isMoving && isWalkAnim) {
-                // stop() fully resets the group; prevents it hanging mid-stride.
                 localWalkAnim.stop();
                 isWalkAnim = false;
             }
@@ -295,8 +311,8 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
         prevY          = currentY;
 
         if (!canJump) {
-            if (!hasPeaked && deltaY < -0.02)   hasPeaked = true;
-            if (hasPeaked  && deltaY >= -0.005) { canJump = true; hasPeaked = false; }
+            if (!hasPeaked && deltaY < -0.02)    hasPeaked = true;
+            if  (hasPeaked && deltaY >= -0.005)  { canJump = true; hasPeaked = false; }
         }
 
         // Kill on falling off map
@@ -319,7 +335,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
             }
 
             if (mob.jumpPressed && canJump) {
-                canJump  = false;
+                canJump   = false;
                 hasPeaked = false;
                 camera.cameraDirection.y = JUMP_FORCE;
             }
@@ -341,7 +357,7 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
 
         if (e.code === "Space" && canJump) {
             canJump   = false;
-            hasPeaked  = false;
+            hasPeaked = false;
             camera.cameraDirection.y = JUMP_FORCE;
         }
 
@@ -379,9 +395,10 @@ function shoot(scene: Scene, canvas: HTMLCanvasElement) {
     const meshName = pick.pickedMesh.name;
     console.log("Hit:", meshName);
 
-    // Remote player hit
+    // ── Hit a remote player ───────────────────────────────────────────────────
     const remoteId = getRemotePlayerIdFromMesh(meshName);
     if (remoteId) {
+        // 10 damage per shot — server validates and clamps
         sendHit(remoteId, 10);
         const dir = pick.ray?.direction;
         if (dir) sendShoot(dir.x, dir.y, dir.z);
@@ -390,7 +407,7 @@ function shoot(scene: Scene, canvas: HTMLCanvasElement) {
 
     // Crate flash
     if (meshName.startsWith("crate") && pick.pickedMesh.material) {
-        const mat = pick.pickedMesh.material as StandardMaterial;
+        const mat  = pick.pickedMesh.material as StandardMaterial;
         const orig = mat.diffuseColor.clone();
         mat.diffuseColor = new Color3(1, 1, 1);
         setTimeout(() => { mat.diffuseColor = orig; }, 100);
