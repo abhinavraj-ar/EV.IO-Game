@@ -9,7 +9,13 @@ import {
     Vector3,
     Mesh,
     DynamicTexture,
+    TransformNode,
+    AnimationGroup,
 } from "@babylonjs/core";
+import {
+    createCharacterInstance,
+    createGunInstance,
+} from "./assetManager";
 
 // ─────────────────────────────────────────────
 // Types
@@ -36,11 +42,13 @@ export interface LeaderboardEntry {
 }
 
 interface RemotePlayer {
-    state:     PlayerState;
-    mesh:      Mesh;       // Body capsule
-    headMesh:  Mesh;       // Head sphere
-    label:     Mesh;       // Floating name plane
-    labelTex:  DynamicTexture;
+    state:      PlayerState;
+    root:       TransformNode;
+    hitCapsule: Mesh;
+    label:      Mesh;       // Floating name plane
+    labelTex:   DynamicTexture;
+    walkAnim:   AnimationGroup | null;
+    lastPos:    Vector3;
 }
 
 const _rawUrl   = import.meta.env.VITE_SERVER_URL as string | undefined;
@@ -224,12 +232,27 @@ function handlePlayerMoved(data: { id: string; x: number; y: number; z: number; 
     const rp = remotePlayers.get(data.id);
     if (!rp) return;
 
-    // Lerp toward the new position for smoother movement
-    const target = new Vector3(data.x, data.y, data.z);
-    rp.mesh.position     = Vector3.Lerp(rp.mesh.position, target, 0.3);
-    rp.headMesh.position = Vector3.Lerp(rp.headMesh.position, target.add(new Vector3(0, 1.2, 0)), 0.3);
-    rp.label.position    = Vector3.Lerp(rp.label.position,    target.add(new Vector3(0, 2.4, 0)), 0.3);
-    rp.mesh.rotation.y   = data.rotY;
+    const targetPos      = new Vector3(data.x, data.y - 0.9, data.z);
+    const targetLabelPos = new Vector3(data.x, data.y + 2.2, data.z);
+    const targetCapsPos  = new Vector3(data.x, data.y,       data.z); // world-space capsule centre
+
+    // Walk animation (speed 1.2 matching local player)
+    const isMoving = Vector3.DistanceSquared(targetPos, rp.lastPos) > 0.001;
+    rp.lastPos.copyFrom(targetPos);
+
+    if (rp.walkAnim) {
+        if (isMoving) {
+            if (!rp.walkAnim.isPlaying) rp.walkAnim.start(true, 1.2);
+        } else {
+            if (rp.walkAnim.isPlaying) rp.walkAnim.pause();
+        }
+    }
+
+    // Lerp character root, label, and hit capsule together
+    rp.root.position       = Vector3.Lerp(rp.root.position,       targetPos,      0.3);
+    rp.label.position      = Vector3.Lerp(rp.label.position,      targetLabelPos, 0.3);
+    rp.hitCapsule.position = Vector3.Lerp(rp.hitCapsule.position, targetCapsPos,  0.3);
+    rp.root.rotation.y     = data.rotY;
 
     rp.state.x    = data.x;
     rp.state.y    = data.y;
@@ -244,7 +267,7 @@ function handlePlayerDamaged(data: { id: string; health: number; attackerId: str
     } else {
         // Visual feedback: flash the remote player red
         const rp = remotePlayers.get(data.id);
-        if (rp) flashMesh(rp.mesh);
+        if (rp) flashMesh(rp.hitCapsule);
     }
 }
 
@@ -254,11 +277,10 @@ function handlePlayerDied(data: { id: string; killerId: string }) {
     } else {
         const rp = remotePlayers.get(data.id);
         if (rp) {
-            // Hide remote player mesh while dead
-            rp.mesh.isVisible     = false;
-            rp.headMesh.isVisible = false;
-            rp.label.isVisible    = false;
-            rp.state.isDead       = true;
+            rp.root.setEnabled(false);
+            rp.label.isVisible = false;
+            if (rp.walkAnim?.isPlaying) rp.walkAnim.pause();
+            rp.state.isDead = true;
         }
     }
 }
@@ -273,14 +295,12 @@ function handlePlayerRespawned(data: { id: string; x: number; y: number; z: numb
     } else {
         const rp = remotePlayers.get(data.id);
         if (rp) {
-            rp.mesh.position     = new Vector3(data.x, data.y, data.z);
-            rp.headMesh.position = new Vector3(data.x, data.y + 1.2, data.z);
-            rp.label.position    = new Vector3(data.x, data.y + 2.4, data.z);
-            rp.mesh.isVisible     = true;
-            rp.headMesh.isVisible = true;
-            rp.label.isVisible    = true;
-            rp.state.health       = data.health;
-            rp.state.isDead       = false;
+            rp.root.position = new Vector3(data.x, data.y - 0.9, data.z);
+            rp.label.position = new Vector3(data.x, data.y + 2.2, data.z);
+            rp.root.setEnabled(true);
+            rp.label.isVisible = true;
+            rp.state.health = data.health;
+            rp.state.isDead = false;
         }
     }
 }
@@ -326,66 +346,96 @@ function idToColor(id: string): Color3 {
 }
 
 /**
- * Create a capsule + head + floating name label for a remote player.
- * Body mesh is named "rp_body_<socketId>" so raycast hits can identify targets.
+ * Create a GLB character instance + gun + invisible hit capsule + floating name label.
+ * Body hit capsule is named "rp_body_<socketId>" so raycast hits can identify targets.
  */
 function spawnRemotePlayer(id: string, state: PlayerState) {
     if (remotePlayers.has(id)) return;
 
-    const pos = new Vector3(state.x, state.y, state.z);
-
-    // Derive this player's unique color from their socket ID
     const playerColor = idToColor(id);
-    // A slightly lighter tint for the head
-    const headColor   = new Color3(
-        Math.min(playerColor.r + 0.2, 1),
-        Math.min(playerColor.g + 0.2, 1),
-        Math.min(playerColor.b + 0.2, 1),
-    );
 
-    // Body
-    const mesh = MeshBuilder.CreateCapsule(`rp_body_${id}`, { height: 2, radius: 0.4 }, scene);
-    mesh.position = pos.clone();
-    const bodyMat = new StandardMaterial(`rp_mat_${id}`, scene);
-    bodyMat.diffuseColor  = playerColor;
-    bodyMat.specularColor = new Color3(0.3, 0.3, 0.3); // subtle sheen
-    mesh.material = bodyMat;
-    mesh.checkCollisions = false;
+    // Instantiate GLB character (proper Mesh clones — always visible)
+    const { root, meshes: charMeshes, walkAnim, weaponBone, charScale } =
+        createCharacterInstance(scene, `rp_${id}`);
 
-    // Head (lighter tint of the same color)
-    const headMesh = MeshBuilder.CreateSphere(`rp_head_${id}`, { diameter: 0.7 }, scene);
-    headMesh.position = pos.add(new Vector3(0, 1.2, 0));
-    const headMat = new StandardMaterial(`rp_head_mat_${id}`, scene);
-    headMat.diffuseColor  = headColor;
-    headMat.specularColor = new Color3(0.3, 0.3, 0.3);
-    headMesh.material = headMat;
-    headMesh.isPickable = false;
+    root.position.set(state.x, state.y - 0.9, state.z);
+    root.rotation.y = state.rotY;
+
+    // Guarantee the hierarchy is enabled & every mesh is visible
+    root.setEnabled(true);
+    charMeshes.forEach(m => {
+        m.isVisible  = true;
+        m.isPickable = false;
+    });
+
+    // Hit capsule — create as a SIBLING of root (not child), so its position
+    // is in world space and is not affected by root.scaling = charScale.
+    const hitCapsule = MeshBuilder.CreateCapsule(`rp_body_${id}`, { height: 1.8, radius: 0.45 }, scene);
+    hitCapsule.isVisible  = false;
+    hitCapsule.isPickable = true;
+    // Position is driven every frame in handlePlayerMoved via the root lerp;
+    // set an initial world position here.
+    hitCapsule.position.set(state.x, state.y, state.z);
+
+    // GLB gun — scale relative to charScale
+    const { root: gunRoot } = createGunInstance(scene, `rp_gun_${id}`);
+    const rpGunScale = charScale * 18;
+    gunRoot.scaling.setAll(rpGunScale);
+
+    if (weaponBone) {
+        gunRoot.parent = weaponBone;
+        gunRoot.position.set(0, 0, 0);
+        gunRoot.rotation.set(0, 0, 0); // gun GLB already faces forward
+    } else {
+        // Fallback offset in the wrapper's LOCAL space
+        gunRoot.parent = root;
+        gunRoot.position.set(
+            0.35 / charScale,
+            1.05 / charScale,
+            0.25 / charScale,
+        );
+        gunRoot.rotation.set(0, 0, 0); // gun GLB already faces forward
+    }
+
+    // If player was already dead when we connected, hide immediately
+    if (state.isDead) {
+        root.setEnabled(false);
+    }
 
     // Floating name label
     const labelPlane = MeshBuilder.CreatePlane(`rp_label_${id}`, { width: 2, height: 0.5 }, scene);
-    labelPlane.position    = pos.add(new Vector3(0, 2.4, 0));
+    labelPlane.position    = new Vector3(state.x, state.y + 2.2, state.z);
     labelPlane.billboardMode = Mesh.BILLBOARDMODE_ALL;
-    labelPlane.isPickable    = false;
+    labelPlane.isPickable  = false;
+    labelPlane.isVisible   = !state.isDead;
 
     const labelTex = new DynamicTexture(`rp_label_tex_${id}`, { width: 256, height: 64 }, scene, false);
     labelTex.hasAlpha = true;
-    drawNameLabel(labelTex, state.name || id.slice(0, 8), playerColor); // use real display name
+    drawNameLabel(labelTex, state.name || id.slice(0, 8), playerColor);
 
     const labelMat = new StandardMaterial(`rp_label_mat_${id}`, scene);
-    labelMat.diffuseTexture = labelTex;
-    labelMat.emissiveColor  = new Color3(1, 1, 1);
-    labelMat.backFaceCulling = false;
-    labelPlane.material = labelMat;
+    labelMat.diffuseTexture   = labelTex;
+    labelMat.emissiveColor    = new Color3(1, 1, 1);
+    labelMat.backFaceCulling  = false;
+    labelPlane.material       = labelMat;
 
-    remotePlayers.set(id, { state, mesh, headMesh, label: labelPlane, labelTex });
-    console.log(`[NET] Spawned remote player: ${id}`);
+    remotePlayers.set(id, {
+        state,
+        root,
+        hitCapsule,
+        label:    labelPlane,
+        labelTex,
+        walkAnim,
+        lastPos: new Vector3(state.x, state.y - 0.9, state.z),
+    });
+
+    console.log(`[NET] Spawned remote player: ${id} (charScale=${charScale.toFixed(4)})`);
 }
 
 function despawnRemotePlayer(id: string) {
     const rp = remotePlayers.get(id);
     if (!rp) return;
-    rp.mesh.dispose();
-    rp.headMesh.dispose();
+    rp.root.dispose();
     rp.label.dispose();
     rp.labelTex.dispose();
     remotePlayers.delete(id);

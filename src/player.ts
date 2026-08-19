@@ -2,12 +2,12 @@ import {
     Scene,
     UniversalCamera,
     Vector3,
-    MeshBuilder,
     StandardMaterial,
     Color3,
-    TransformNode,
-    Ray,
 } from "@babylonjs/core";
+import {
+    createCharacterInstance,
+} from "./assetManager";
 import {
     sendMove,
     sendShoot,
@@ -25,470 +25,149 @@ import {
     type LeaderboardEntry,
 } from "./network";
 import {
-    _isMobile,
     isMobileDevice,
     setupMobileControls,
     getMobileInput,
     resetFrameInput,
 } from "./mobile-controls";
 
-// Expose the camera so network.ts can read position if needed
+// ── Module-level camera reference (consumed by network.ts if needed) ─────────
 let _camera: UniversalCamera;
-
-
-const gunFireSound = new Audio("/sounds/gun-fire.wav");
-gunFireSound.volume = 0.7;
-
-
-const backgroundSound = new Audio("/sounds/background.mp3");
-backgroundSound.loop = true;
-backgroundSound.volume = 0.25;
-
-
-
 export function getCamera(): UniversalCamera { return _camera; }
 
+// ── Sounds ───────────────────────────────────────────────────────────────────
+const gunFireSound    = new Audio("/sounds/gun-fire.wav");
+gunFireSound.volume   = 0.7;
+
+const backgroundSound  = new Audio("/sounds/background.mp3");
+backgroundSound.loop   = true;
+backgroundSound.volume = 0.25;
+
+// =============================================================================
+// SETUP PLAYER
+// =============================================================================
 export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
 
     const isMobile = isMobileDevice();
 
-    backgroundSound.play().catch((error) => {
-        console.error("Background sound error:", error);
-    });
+    backgroundSound.play().catch(err => console.error("Background sound:", err));
 
-
-
-    //Setup Camera & Spawn Point
-    const spawnPoint = new Vector3(0, 1, 0); // just above ground
-    const camera = new UniversalCamera("playerCamera", spawnPoint.clone(), scene);
-
-
-
-
-
+    // ── Camera / Spawn ────────────────────────────────────────────────────────
+    const spawnPoint = new Vector3(0, 1, 0);
+    const camera     = new UniversalCamera("playerCamera", spawnPoint.clone(), scene);
     camera.setTarget(new Vector3(0, 0, 10));
     camera.attachControl(canvas, true);
     _camera = camera;
 
-    //Physics & Controls Setup
+    // ── Movement keys ─────────────────────────────────────────────────────────
     camera.keysUp.push(87);    // W
     camera.keysDown.push(83);  // S
     camera.keysLeft.push(65);  // A
     camera.keysRight.push(68); // D
     camera.speed = 0.4;
+    camera.angularSensibility = isMobile ? 9_999_999 : 2500;
 
-    camera.angularSensibility = isMobile ? 9999999 : 2500; // effectively disable built-in mouse look on mobile
-
-
-    camera.applyGravity = true;
+    // ── Physics ───────────────────────────────────────────────────────────────
+    camera.applyGravity    = true;
     camera.checkCollisions = true;
-
-    //Create a tall, thin collision bubble
-    camera.ellipsoid = new Vector3(0.5, 1, 0.5);
+    camera.ellipsoid       = new Vector3(0.5, 1, 0.5);
     camera.ellipsoidOffset = new Vector3(0, 1, 0);
 
-    
+    // =========================================================================
+    // LOCAL PLAYER CHARACTER (GLB)
+    // The mesh stays invisible in first-person, but the skeleton/animation
+    // is still driven so that remote players see correct leg movement via the
+    // position + walkAnim state broadcast over the network.
+    // =========================================================================
+    const {
+        root:     localPlayerRoot,
+        meshes:   localPlayerMeshes,
+        walkAnim: localWalkAnim,
+    } = createCharacterInstance(scene, "local_player");
 
-
-
-    //Health & Death System
-    let maxHealth = 100;
-    let currentHealth = maxHealth;
-
-    
-    // 3D SCI-FI GUN
-    
-
-    const gunRoot = new TransformNode("gunRoot", scene);
-    gunRoot.parent = camera;
-
-    // -----------------------------
-    // Gun materials
-    // -----------------------------
-
-    const gunBodyMat = new StandardMaterial("gunBodyMat", scene);
-    gunBodyMat.diffuseColor = new Color3(0.08, 0.09, 0.11);
-    gunBodyMat.specularColor = new Color3(0.5, 0.5, 0.5);
-
-    const gunMetalMat = new StandardMaterial("gunMetalMat", scene);
-    gunMetalMat.diffuseColor = new Color3(0.25, 0.28, 0.32);
-    gunMetalMat.specularColor = new Color3(0.8, 0.8, 0.8);
-
-    const gunEnergyMat = new StandardMaterial("gunEnergyMat", scene);
-    gunEnergyMat.diffuseColor = new Color3(0.1, 0.5, 1.0);
-    gunEnergyMat.emissiveColor = new Color3(0.05, 0.25, 0.8);
-
-    // -----------------------------
-    // Main gun body
-    // -----------------------------
-
-    const gunBody = MeshBuilder.CreateBox(
-        "gunBody",
-        {
-            width: 0.45,
-            height: 0.30,
-            depth: 1.15
-        },
-        scene
-    );
-
-    gunBody.material = gunBodyMat;
-    gunBody.parent = gunRoot;
-    gunBody.position = new Vector3(0, 0, 0);
-
-    
-    // Upper rail
-    
-
-    const upperRail = MeshBuilder.CreateBox(
-        "upperRail",
-        {
-            width: 0.22,
-            height: 0.10,
-            depth: 0.75
-        },
-        scene
-    );
-
-    upperRail.material = gunMetalMat;
-    upperRail.parent = gunRoot;
-    upperRail.position = new Vector3(0, 0.20, -0.05);
-
-    
-    // Barrel
-    
-
-    const barrel = MeshBuilder.CreateCylinder(
-        "barrel",
-        {
-            diameter: 0.13,
-            height: 0.75,
-            tessellation: 16
-        },
-        scene
-    );
-
-    barrel.rotation.x = Math.PI / 2;
-    barrel.material = gunMetalMat;
-    barrel.parent = gunRoot;
-    barrel.position = new Vector3(0, 0.02, 0.82);
-
-    
-    // Barrel energy core
-    
-    const energyCore = MeshBuilder.CreateCylinder(
-        "energyCore",
-        {
-            diameter: 0.07,
-            height: 0.60,
-            tessellation: 12
-        },
-        scene
-    );
-
-    energyCore.rotation.x = Math.PI / 2;
-    energyCore.material = gunEnergyMat;
-    energyCore.parent = gunRoot;
-    energyCore.position = new Vector3(0, 0.02, 0.85);
-
-   
-    // Grip
-    
-
-    const grip = MeshBuilder.CreateBox(
-        "grip",
-        {
-            width: 0.28,
-            height: 0.65,
-            depth: 0.35
-        },
-        scene
-    );
-
-    grip.material = gunBodyMat;
-    grip.parent = gunRoot;
-    grip.position = new Vector3(0, -0.42, -0.15);
-
-    // Slight backward angle
-    grip.rotation.z = -0.15;
-
-    
-    // Trigger guard
-    
-
-    const triggerGuard = MeshBuilder.CreateBox(
-        "triggerGuard",
-        {
-            width: 0.30,
-            height: 0.08,
-            depth: 0.25
-        },
-        scene
-    );
-
-    triggerGuard.material = gunMetalMat;
-    triggerGuard.parent = gunRoot;
-    triggerGuard.position = new Vector3(0, -0.18, 0.05);
-
-    // -----------------------------
-    // Side energy panel
-    // -----------------------------
-
-    const sidePanel = MeshBuilder.CreateBox(
-        "sidePanel",
-        {
-            width: 0.04,
-            height: 0.16,
-            depth: 0.45
-        },
-        scene
-    );
-
-    sidePanel.material = gunEnergyMat;
-    sidePanel.parent = gunRoot;
-    sidePanel.position = new Vector3(0.24, 0.05, 0);
-
-    // -----------------------------
-    // Attach gun to FPS camera
-    // -----------------------------
-
-    gunRoot.position = new Vector3(0.55, -0.45, 1.1);
-    gunRoot.rotation = new Vector3(0, 0, 0);
-    gunRoot.scaling = new Vector3(0.75, 0.75, 0.75);
-
-    // Don't let gun interfere with shooting raycast
-    [
-        gunBody,
-        upperRail,
-        barrel,
-        energyCore,
-        grip,
-        triggerGuard,
-        sidePanel
-    ].forEach(mesh => {
-        mesh.isPickable = false;
-    });
-
-    // ============================================================
-    // LOCAL PLAYER CHARACTER MESH (FOR 3RD PERSON VIEW)
-    // ============================================================
-    const localPlayerRoot = new TransformNode("localPlayerRoot", scene);
-
-    // Body capsule
-    const localPlayerBody = MeshBuilder.CreateCapsule("local_player_body", { height: 1.8, radius: 0.45 }, scene);
-    localPlayerBody.parent = localPlayerRoot;
-    localPlayerBody.position.set(0, 0.9, 0);
-    const localBodyMat = new StandardMaterial("localBodyMat", scene);
-    localBodyMat.diffuseColor = new Color3(0.12, 0.45, 0.85); // Vibrant cyan/blue armor
-    localBodyMat.specularColor = new Color3(0.5, 0.5, 0.5);
-    localPlayerBody.material = localBodyMat;
-
-    // Head sphere
-    const localPlayerHead = MeshBuilder.CreateSphere("local_player_head", { diameter: 0.65 }, scene);
-    localPlayerHead.parent = localPlayerRoot;
-    localPlayerHead.position.set(0, 1.9, 0);
-    const localHeadMat = new StandardMaterial("localHeadMat", scene);
-    localHeadMat.diffuseColor = new Color3(0.20, 0.55, 0.95);
-    localPlayerHead.material = localHeadMat;
-
-    // Glowing Sci-fi Visor
-    const localPlayerVisor = MeshBuilder.CreateBox("local_player_visor", { width: 0.45, height: 0.16, depth: 0.35 }, scene);
-    localPlayerVisor.parent = localPlayerRoot;
-    localPlayerVisor.position.set(0, 1.95, 0.22);
-    const localVisorMat = new StandardMaterial("localVisorMat", scene);
-    localVisorMat.diffuseColor = new Color3(0.0, 0.9, 1.0);
-    localVisorMat.emissiveColor = new Color3(0.0, 0.7, 1.0);
-    localPlayerVisor.material = localVisorMat;
-
-    // Shoulder Armor Pads
-    const shoulderL = MeshBuilder.CreateBox("local_player_shL", { width: 0.25, height: 0.3, depth: 0.4 }, scene);
-    shoulderL.parent = localPlayerRoot;
-    shoulderL.position.set(-0.52, 1.45, 0);
-    shoulderL.material = localBodyMat;
-
-    const shoulderR = MeshBuilder.CreateBox("local_player_shR", { width: 0.25, height: 0.3, depth: 0.4 }, scene);
-    shoulderR.parent = localPlayerRoot;
-    shoulderR.position.set(0.52, 1.45, 0);
-    shoulderR.material = localBodyMat;
-
-    const localPlayerMeshes = [localPlayerBody, localPlayerHead, localPlayerVisor, shoulderL, shoulderR];
+    // Hide local character from its own camera (first-person)
     localPlayerMeshes.forEach(m => {
-        m.isPickable = false;
+        m.isPickable      = false;
         m.checkCollisions = false;
+        m.isVisible       = false;
     });
 
-    // Camera mode & view toggle
-    let isThirdPerson = true; // Default view is 3rd Person
+    // Local player gun is intentionally NOT shown — the player plays in
+    // first-person and should not see a floating gun in their own view.
+    // Enemy guns are still visible via network.ts (attached to remote characters).
 
-    const viewBtn = document.createElement("button");
-    viewBtn.id = "cam-view-toggle-btn";
-    viewBtn.innerHTML = "Press [V] to change view";
-    viewBtn.style.position = "fixed";
-    viewBtn.style.top = "15px";
-    viewBtn.style.right = "300px";
-    viewBtn.style.zIndex = "1000";
-    viewBtn.style.padding = "8px 14px";
-    viewBtn.style.backgroundColor = "rgba(121, 119, 125, 0.35)";
-    viewBtn.style.color = "white";
-    viewBtn.style.border = "1.5px solid white";
-    viewBtn.style.borderRadius = "8px";
-    viewBtn.style.fontFamily = "rajdhani";
-    viewBtn.style.fontWeight = "bold";
-    viewBtn.style.fontSize = "13px";
-    viewBtn.style.cursor = "pointer";
-    viewBtn.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.3)";
-    document.body.appendChild(viewBtn);
+    // =========================================================================
+    // HEALTH & DEATH
+    // =========================================================================
+    const maxHealth   = 100;
+    let currentHealth = maxHealth;
+    let isDead        = false;
+    let matchEnded    = false;
 
-    function toggleViewMode() {
-        isThirdPerson = !isThirdPerson;
-        viewBtn.innerHTML = isThirdPerson ? "Press [V] to change view" : "Press [V] to change view";
-        viewBtn.style.color = isThirdPerson ? "#c9e4efff" : "#c9e4efff";
-        viewBtn.style.borderColor = isThirdPerson ? "#c9e4efff" : "#c9e4efff";
-    }
-
-    viewBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        toggleViewMode();
-    });
-
-    let isDead = false;
-    let matchEnded = false;
-
-
-    const healthFill = document.getElementById("health-fill") as HTMLDivElement;
-    const healthText = document.getElementById("health-text") as HTMLSpanElement;
-    const deathScreen = document.getElementById("death-screen") as HTMLDivElement;
-    const winScreen = document.getElementById("win-screen") as HTMLDivElement;
-
-    const playAgainBtn = document.getElementById("play-again-btn") as HTMLButtonElement;
-
-    const respawnBtn = document.getElementById("respawn-btn") as HTMLButtonElement;
-    const leaderboardEl = document.getElementById("leaderboard-list") as HTMLOListElement;
-    const deathWinnerList = document.getElementById("death-winner-list") as HTMLDivElement;
+    const healthFill     = document.getElementById("health-fill")      as HTMLDivElement;
+    const healthText     = document.getElementById("health-text")       as HTMLSpanElement;
+    const deathScreen    = document.getElementById("death-screen")      as HTMLDivElement;
+    const winScreen      = document.getElementById("win-screen")        as HTMLDivElement;
+    const respawnBtn     = document.getElementById("respawn-btn")       as HTMLButtonElement;
+    const leaderboardEl  = document.getElementById("leaderboard-list")  as HTMLOListElement;
+    const deathWinnerList= document.getElementById("death-winner-list") as HTMLDivElement;
+    const playAgainBtn   = document.getElementById("play-again-btn")    as HTMLButtonElement;
 
     if (playAgainBtn) {
-    playAgainBtn.addEventListener("click", () => {
-        sendPlayAgain();
+        playAgainBtn.addEventListener("click", () => {
+            sendPlayAgain();
 
-        // Hide winner screen
-        if (winScreen) {
-            winScreen.style.display = "none";
-        }
+            if (winScreen) winScreen.style.display = "none";
 
-        // Reset local match state
-        matchEnded = false;
-        isDead = false;
-        currentHealth = maxHealth;
+            matchEnded    = false;
+            isDead        = false;
+            currentHealth = maxHealth;
+            updateHealthUI();
 
-        updateHealthUI();
-
-        // Lock mouse again on desktop
-        if (!isMobile && document.pointerLockElement !== canvas) {
-            canvas.requestPointerLock?.();
-        }
-    });
-}
-
-    function updateHealthUI() {
-        const percentage = Math.max(0, (currentHealth / maxHealth) * 100);
-
-        if (healthFill) {
-            healthFill.style.width = percentage + "%";
-
-            if (percentage > 60) {
-                healthFill.style.backgroundColor = "green";
-            } else if (percentage > 30) {
-                healthFill.style.backgroundColor = "yellow";
-            } else {
-                healthFill.style.backgroundColor = "red";
+            if (!isMobile && document.pointerLockElement !== canvas) {
+                canvas.requestPointerLock?.();
             }
-        }
-
-        if (healthText) {
-            healthText.textContent = Math.round(percentage) + "%";
-        }
+        });
     }
 
+    function updateHealthUI() {
+        const pct = Math.max(0, (currentHealth / maxHealth) * 100);
+        if (healthFill) {
+            healthFill.style.width           = pct + "%";
+            healthFill.style.backgroundColor =
+                pct > 60 ? "green" : pct > 30 ? "yellow" : "red";
+        }
+        if (healthText) healthText.textContent = Math.round(pct) + "%";
+    }
 
-    // ── Called by network.ts when the server says we took damage ──────────────
+    function takeDamageLocal(amount: number) {
+        if (isDead) return;
+        currentHealth = Math.max(0, currentHealth - amount);
+        updateHealthUI();
+        if (currentHealth <= 0) killLocal();
+    }
+
+    function killLocal() {
+        isDead = true;
+        if (deathScreen) deathScreen.style.display = "flex";
+        if (!isMobile) document.exitPointerLock?.();
+    }
+
+    // ── Network damage / death / respawn callbacks ────────────────────────────
     onDamaged((health: number, _attackerId: string) => {
         if (isDead) return;
         currentHealth = health;
-
-        if (currentHealth <= 0) {
-            currentHealth = 0;
-            isDead = true;
-            if (deathScreen) deathScreen.style.display = "flex";
-            if (!isMobile) {
-                document.exitPointerLock = document.exitPointerLock || (document as any).webkitExitPointerLock;
-                if (document.exitPointerLock) document.exitPointerLock();
-            }
-        }
         updateHealthUI();
+        if (currentHealth <= 0) killLocal();
     });
 
-    // ── Called by network.ts when the server confirms our death 
     onDied((_killerId: string) => {
         if (isDead) return;
-        isDead = true;
         currentHealth = 0;
         updateHealthUI();
-        if (deathScreen) deathScreen.style.display = "flex";
-        if (!isMobile) {
-            document.exitPointerLock = document.exitPointerLock || (document as any).webkitExitPointerLock;
-            if (document.exitPointerLock) document.exitPointerLock();
-        }
+        killLocal();
     });
 
-
-    onMatchEnded((winnerId: string, winnerName: string) => {
-        const myId = getMyId();
-
-        matchEnded = true;
-        isDead = true;
-
-        const resultIcon = document.getElementById("match-result-icon");
-        const resultTitle = document.getElementById("match-result-title");
-        const resultWinner = document.getElementById("match-result-winner");
-
-        if (winScreen) {
-            winScreen.style.display = "flex";
-        }
-
-        if (winnerId === myId) {
-            // 🏆 WE WON
-            if (resultIcon) {
-                resultIcon.innerText = "🏆";
-            }
-
-            if (resultTitle) {
-                resultTitle.innerText = "YOU WIN!";
-            }
-
-            if (resultWinner) {
-                resultWinner.innerText = `Winner: ${winnerName}`;
-            }
-        } else {
-
-            if (resultIcon) {
-                resultIcon.innerText = "💀";
-            }
-
-            if (resultTitle) {
-                resultTitle.innerText = "YOU LOSE!";
-            }
-
-            if (resultWinner) {
-                resultWinner.innerText = `Winner: ${winnerName}`;
-            }
-        }
-
-        if (!isMobile) {
-            document.exitPointerLock?.();
-        }
-    });
-
-    // ── Called by network.ts when the server respawns us ─────────────────────
     onRespawned((x: number, y: number, z: number) => {
         currentHealth = maxHealth;
         updateHealthUI();
@@ -496,336 +175,204 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
         if (deathScreen) deathScreen.style.display = "none";
         camera.position = new Vector3(x, y, z);
         if (matchEnded) return;
-        camera.cameraDirection = new Vector3(0, 0, 0);
-        canJump = true;
+        camera.cameraDirection = Vector3.Zero();
+        canJump   = true;
         hasPeaked = false;
     });
 
-    // ── Called by network.ts when the leaderboard changes ───────────────────
-    // ── Leaderboard ─────────────────────────────────────────────────────────
+    onMatchEnded((winnerId: string, winnerName: string) => {
+        matchEnded = true;
+        isDead     = true;
+        if (winScreen) winScreen.style.display = "flex";
+
+        const isWinner = winnerId === getMyId();
+        const icon   = document.getElementById("match-result-icon");
+        const title  = document.getElementById("match-result-title");
+        const winner = document.getElementById("match-result-winner");
+        if (icon)   icon.innerText   = isWinner ? "🏆" : "💀";
+        if (title)  title.innerText  = isWinner ? "YOU WIN!" : "YOU LOSE!";
+        if (winner) winner.innerText = `Winner: ${winnerName}`;
+        if (!isMobile) document.exitPointerLock?.();
+    });
+
+    // ── Leaderboard ───────────────────────────────────────────────────────────
     onLeaderboard((entries: LeaderboardEntry[]) => {
-
-        // ============================================================
-        // NORMAL GAME LEADERBOARD
-        // ============================================================
-
         if (leaderboardEl) {
-
             leaderboardEl.innerHTML = entries.map((e, i) => {
-
-                const isMe = e.id === getMyId();
-
-                const medal =
-                    i === 0 ? "🥇" :
-                        i === 1 ? "🥈" :
-                            i === 2 ? "🥉" :
-                                `${i + 1}.`;
-
-                const displayName =
-                    isMe
-                        ? `YOU (${getLocalPlayerName()})`
-                        : e.name;
-
+                const isMe    = e.id === getMyId();
+                const medal   = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
+                const display = isMe ? `YOU (${getLocalPlayerName()})` : e.name;
                 return `
                 <li class="lb-row${isMe ? " lb-me" : ""}">
-
-                    <span class="lb-rank">
-                        ${medal}
-                    </span>
-
-                    <span class="lb-name">
-                        ${displayName}
-                    </span>
-
-                    <span class="lb-kills">
-                        ${e.kills}/5K
-                    </span>
-
-                    <span class="lb-pts">
-                        ${e.points}pts
-                    </span>
-
-                </li>
-            `;
+                    <span class="lb-rank">${medal}</span>
+                    <span class="lb-name">${display}</span>
+                    <span class="lb-kills">${e.kills}/5K</span>
+                    <span class="lb-pts">${e.points}pts</span>
+                </li>`;
             }).join("");
         }
 
-
-
-        // WINNER LIST ON DEATH SCREEN
-
         if (deathWinnerList) {
-
-            // Show only TOP 3 players
-            const winners = entries.slice(0, 3);
-
-            deathWinnerList.innerHTML = winners.map((e, i) => {
-
-                const isMe = e.id === getMyId();
-
-                const medal =
-                    i === 0 ? "🥇" :
-                        i === 1 ? "🥈" :
-                            "🥉";
-
-                const position =
-                    i === 0 ? "1ST" :
-                        i === 1 ? "2ND" :
-                            "3RD";
-
-                const displayName =
-                    isMe
-                        ? `YOU (${getLocalPlayerName()})`
-                        : e.name;
-
+            deathWinnerList.innerHTML = entries.slice(0, 3).map((e, i) => {
+                const isMe    = e.id === getMyId();
+                const medal   = i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉";
+                const place   = i === 0 ? "1ST" : i === 1 ? "2ND" : "3RD";
+                const display = isMe ? `YOU (${getLocalPlayerName()})` : e.name;
                 return `
                 <div class="death-winner-row">
-
-                    <div class="winner-position">
-                        ${medal}
-                    </div>
-
+                    <div class="winner-position">${medal}</div>
                     <div class="winner-info">
-
-                        <div class="winner-name">
-                            ${displayName}
-                        </div>
-
-                        <div class="winner-stats">
-                            ${e.kills} Kills
-                            &nbsp; • &nbsp;
-                            ${e.points} Points
-                        </div>
-
+                        <div class="winner-name">${display}</div>
+                        <div class="winner-stats">${e.kills} Kills &nbsp;•&nbsp; ${e.points} Points</div>
                     </div>
-
-                    <div class="winner-place">
-                        ${position}
-                    </div>
-
-                </div>
-            `;
-
+                    <div class="winner-place">${place}</div>
+                </div>`;
             }).join("");
         }
     });
 
-    // Local damage (e.g. fall damage) — also tells the server via player:hit
-    function takeDamageLocal(amount: number) {
-        if (isDead) return;
-        currentHealth -= amount;
-        if (currentHealth < 0) currentHealth = 0;
-        updateHealthUI();
-
-        if (currentHealth <= 0) {
-            isDead = true;
-            if (deathScreen) deathScreen.style.display = "flex";
-            if (!isMobile) {
-                document.exitPointerLock = document.exitPointerLock || (document as any).webkitExitPointerLock;
-                if (document.exitPointerLock) document.exitPointerLock();
-            }
-        }
-    }
-
-    //Respawn Button Logic
+    // ── Respawn button ────────────────────────────────────────────────────────
     if (respawnBtn) {
         respawnBtn.addEventListener("click", () => {
             if (matchEnded) return;
-            // Tell the server to respawn us — it will reply with player:respawned
             sendRespawn();
-
-            // Also handle local fallback (in case server is unreachable)
             deathScreen.style.display = "none";
-            currentHealth = maxHealth;
+            currentHealth             = maxHealth;
             updateHealthUI();
-            camera.position = spawnPoint.clone();
-            camera.cameraDirection = new Vector3(0, 0, 0);
-            canJump = true;
+            camera.position           = spawnPoint.clone();
+            camera.cameraDirection    = Vector3.Zero();
+            canJump   = true;
             hasPeaked = false;
-            isDead = false;
+            isDead    = false;
         });
     }
 
+    // =========================================================================
+    // JUMP
+    // =========================================================================
+    const JUMP_FORCE = 2;
+    let canJump   = true;
+    let hasPeaked = false;
+    let prevY     = spawnPoint.y;
 
-
-    const JUMP_FORCE = 2; // single upward impulse injected into cameraDirection.y
-    let canJump = true;     // whether the player is allowed to jump
-    let hasPeaked = false;    // true once the player has visibly started falling
-    let prevY = spawnPoint.y;
-
-    // ── Mobile setup ─────────────────────────────────────────────────────────
+    // =========================================================================
+    // MOBILE
+    // =========================================================================
     setupMobileControls();
 
+    // =========================================================================
+    // PER-FRAME LOOP
+    // =========================================================================
     const realPlayerPos = new Vector3();
+    let   lastAnimPos   = new Vector3();
+
+    // Track walk-anim state with our own boolean.
+    // DO NOT rely on localWalkAnim.isPlaying — BabylonJS briefly sets it to
+    // false between loop iterations which causes the animation to stutter / stop.
+    let isWalkAnim = false;
 
     scene.onBeforeRenderObservable.add(() => {
         if (isDead) {
-            localPlayerMeshes.forEach(m => m.isVisible = false);
+            if (isWalkAnim) {
+                localWalkAnim?.stop();
+                isWalkAnim = false;
+            }
             return;
         }
 
-        // 1. Capture real physical player position before frame rendering
+        // ── Capture physics position ──────────────────────────────────────────
         realPlayerPos.copyFrom(camera.position);
 
-        // 2. Position local 3D character mesh at physical location
-        localPlayerRoot.position.copyFrom(realPlayerPos).addInPlace(new Vector3(0, -0.9, 0));
+        // ── Walk animation — natural right-then-left leg cycle ────────────────
+        // We compare positions from the PREVIOUS frame so even slow movement
+        // is detected. Threshold is kept tiny (1e-6) to avoid false-stops.
+        const isMoving = Vector3.DistanceSquared(realPlayerPos, lastAnimPos) > 1e-6;
+        lastAnimPos.copyFrom(realPlayerPos);
+
+        if (localWalkAnim) {
+            if (isMoving && !isWalkAnim) {
+                localWalkAnim.start(true, 1.2, localWalkAnim.from, localWalkAnim.to);
+                isWalkAnim = true;
+            } else if (!isMoving && isWalkAnim) {
+                localWalkAnim.stop();
+                isWalkAnim = false;
+            }
+        }
+
+        // ── Sync invisible character root with camera (for remote-player view) ─
+        localPlayerRoot.position
+            .copyFrom(realPlayerPos)
+            .addInPlace(new Vector3(0, -0.9, 0));
         localPlayerRoot.rotation.y = camera.rotation.y;
 
-        // 3. Update view-dependent gun & camera spring-arm positioning
-        if (isThirdPerson) {
-            localPlayerMeshes.forEach(m => m.isVisible = true);
-            gunRoot.parent = localPlayerRoot;
-            gunRoot.position.set(0.38, 1.05, 0.35);
-            gunRoot.rotation.set(0, 0, 0);
-            gunRoot.scaling.set(0.65, 0.65, 0.65);
-
-            // Compute over-the-shoulder third person camera location
-            const targetHead = realPlayerPos.add(new Vector3(0, 0.6, 0));
-            const yaw = camera.rotation.y;
-            const pitch = Math.max(-0.6, Math.min(0.8, camera.rotation.x));
-            const dist = 3.8;
-            const rightOffset = 0.55;
-
-            const cosP = Math.cos(pitch);
-            const sinP = Math.sin(pitch);
-            const sinY = Math.sin(yaw);
-            const cosY = Math.cos(yaw);
-
-            const offsetX = -sinY * cosP * dist + cosY * rightOffset;
-            const offsetY = sinP * dist + 0.5;
-            const offsetZ = -cosY * cosP * dist - sinY * rightOffset;
-
-            const desiredCamPos = targetHead.add(new Vector3(offsetX, offsetY, offsetZ));
-
-            // Camera wall collision prevention raycast
-            const rayDir = desiredCamPos.subtract(targetHead);
-            const rayLen = rayDir.length();
-            if (rayLen > 0.001) {
-                const normDir = rayDir.scale(1 / rayLen);
-                const ray = new Ray(targetHead, normDir, rayLen);
-                const pick = scene.pickWithRay(ray, (m) => m.checkCollisions && m.name !== "ground");
-                if (pick && pick.hit && pick.pickedPoint) {
-                    desiredCamPos.copyFrom(pick.pickedPoint.subtract(normDir.scale(0.2)));
-                }
-            }
-
-            camera.position.copyFrom(desiredCamPos);
-        } else {
-            localPlayerMeshes.forEach(m => m.isVisible = false);
-            gunRoot.parent = camera;
-            gunRoot.position.set(0.55, -0.45, 1.1);
-            gunRoot.rotation.set(0, 0, 0);
-            gunRoot.scaling.set(0.75, 0.75, 0.75);
-        }
-
+        // ── Jump / fall detection ─────────────────────────────────────────────
         const currentY = realPlayerPos.y;
-        const deltaY = currentY - prevY;
-        prevY = currentY;
+        const deltaY   = currentY - prevY;
+        prevY          = currentY;
 
         if (!canJump) {
-            // Phase A: detect the falling portion of the arc
-            if (!hasPeaked && deltaY < -0.02) {
-                hasPeaked = true;
-            }
-            // Phase B: once genuinely falling, detect landing (fall stops)
-            if (hasPeaked && deltaY >= -0.005) {
-                canJump = true;
-                hasPeaked = false;
-            }
+            if (!hasPeaked && deltaY < -0.02)    hasPeaked = true;
+            if  (hasPeaked && deltaY >= -0.005)  { canJump = true; hasPeaked = false; }
         }
 
-        // Fell off the map
-        if (realPlayerPos.y < -10) {
-            takeDamageLocal(100);
-        }
+        // Kill on falling off map
+        if (realPlayerPos.y < -10) takeDamageLocal(100);
 
-        // ── Mobile joystick movement ──────────────────────────────────────────
+        // ── Mobile joystick & shoot ───────────────────────────────────────────
         if (isMobile) {
             const mob = getMobileInput();
 
-            // Apply look rotation
             if (mob.lookDX !== 0 || mob.lookDY !== 0) {
                 camera.rotation.y += mob.lookDX;
-                camera.rotation.x += mob.lookDY;
-                // Clamp vertical look
-                camera.rotation.x = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, camera.rotation.x));
+                camera.rotation.x  = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, camera.rotation.x + mob.lookDY));
             }
 
-            // Apply joystick movement (local-space, relative to camera yaw)
             if (mob.moveX !== 0 || mob.moveZ !== 0) {
                 const yaw = camera.rotation.y;
-                const speed = camera.speed;
-                const fwdX = Math.sin(yaw) * mob.moveZ * speed;
-                const fwdZ = Math.cos(yaw) * mob.moveZ * speed;
-                const strX = Math.cos(yaw) * mob.moveX * speed;
-                const strZ = -Math.sin(yaw) * mob.moveX * speed;
-                camera.cameraDirection.x += fwdX + strX;
-                camera.cameraDirection.z += fwdZ + strZ;
+                const spd = camera.speed;
+                camera.cameraDirection.x += Math.sin(yaw) * mob.moveZ * spd + Math.cos(yaw) * mob.moveX * spd;
+                camera.cameraDirection.z += Math.cos(yaw) * mob.moveZ * spd - Math.sin(yaw) * mob.moveX * spd;
             }
 
-            // Jump
             if (mob.jumpPressed && canJump) {
-                canJump = false;
+                canJump   = false;
                 hasPeaked = false;
                 camera.cameraDirection.y = JUMP_FORCE;
             }
 
-            // Shoot
-            if (mob.shootPressed) {
-                shoot(scene, canvas);
-            }
+            if (mob.shootPressed) shoot(scene, canvas);
 
             resetFrameInput();
         }
 
-        // ── Send position to server every frame (network.ts throttles to 20Hz) ──
-        sendMove(
-            realPlayerPos.x,
-            realPlayerPos.y,
-            realPlayerPos.z,
-            camera.rotation.y,
-        );
+        // ── Network position broadcast ────────────────────────────────────────
+        sendMove(realPlayerPos.x, realPlayerPos.y, realPlayerPos.z, camera.rotation.y);
     });
 
-    scene.onAfterRenderObservable.add(() => {
-        if (isThirdPerson && !isDead) {
-            // Restore true physical position so input engine processes deltas correctly
-            camera.position.copyFrom(realPlayerPos);
-        }
-    });
-
-    // ── Desktop keyboard controls ─────────────────────────────────────────────
+    // =========================================================================
+    // KEYBOARD (desktop)
+    // =========================================================================
     window.addEventListener("keydown", (e) => {
         if (isDead) return;
 
         if (e.code === "Space" && canJump) {
-            canJump = false;
+            canJump   = false;
             hasPeaked = false;
-            // Single impulse — BabylonJS gravity + inertia handles the rest
             camera.cameraDirection.y = JUMP_FORCE;
         }
 
-        // View mode toggle
-        if (e.code === "KeyV") {
-            toggleViewMode();
-        }
-
-        // Press 'H' to test local damage
-        if (e.code === "KeyH") {
-            takeDamageLocal(15);
-        }
+        // Debug: H key → take 15 damage
+        if (e.code === "KeyH") takeDamageLocal(15);
     });
 
-    // ── Desktop Pointer Lock & Shooting ───────────────────────────────────────
+    // =========================================================================
+    // POINTER LOCK & SHOOT (desktop)
+    // =========================================================================
     if (!isMobile) {
         canvas.addEventListener("click", () => {
-            if (isDead) return; // Prevent shooting and locking mouse while dead
-
+            if (isDead) return;
             if (document.pointerLockElement !== canvas) {
-                canvas.requestPointerLock = canvas.requestPointerLock || (canvas as any).webkitRequestPointerLock;
-                if (canvas.requestPointerLock) {
-                    canvas.requestPointerLock();
-                }
+                (canvas.requestPointerLock || (canvas as any).webkitRequestPointerLock)?.call(canvas);
             } else {
                 shoot(scene, canvas);
             }
@@ -835,49 +382,37 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
     return camera;
 }
 
-//Raycast Shooting Mechanic
+// =============================================================================
+// RAYCAST SHOOTING
+// =============================================================================
 function shoot(scene: Scene, canvas: HTMLCanvasElement) {
-    // playGunFireSound();
-
     gunFireSound.currentTime = 0;
-    gunFireSound.play().catch((error) => {
-        console.error("Gun sound error:", error);
-    });
+    gunFireSound.play().catch(err => console.error("Gun sound:", err));
 
+    const pick = scene.pick(canvas.width / 2, canvas.height / 2);
+    if (!pick.hit || !pick.pickedMesh) return;
 
+    const meshName = pick.pickedMesh.name;
+    console.log("Hit:", meshName);
 
-
-    const pickInfo = scene.pick(canvas.width / 2, canvas.height / 2);
-
-    if (pickInfo.hit && pickInfo.pickedMesh) {
-        const meshName = pickInfo.pickedMesh.name;
-        console.log("Hit: " + meshName);
-
-        // ── Hit a remote player ───────────────────────────────────────────────
-        const remoteId = getRemotePlayerIdFromMesh(meshName);
-        if (remoteId) {
-            // 10 damage per shot — server validates and clamps
-            sendHit(remoteId, 20);
-            // Emit the shot direction for bullet-trail effects
-            const dir = pickInfo.ray?.direction;
-            if (dir) sendShoot(dir.x, dir.y, dir.z);
-            return;
-        }
-
-        // ── Hit a crate ───────────────────────────────────────────────────────
-        if (meshName.startsWith("crate") && pickInfo.pickedMesh.material) {
-            const mat = pickInfo.pickedMesh.material as StandardMaterial;
-            const originalColor = mat.diffuseColor;
-
-            mat.diffuseColor = new Color3(1, 1, 1);
-
-            setTimeout(() => {
-                mat.diffuseColor = originalColor;
-            }, 100);
-        }
-
-        // Emit shot direction regardless of what was hit
-        const dir = pickInfo.ray?.direction;
+    // ── Hit a remote player ───────────────────────────────────────────────────
+    const remoteId = getRemotePlayerIdFromMesh(meshName);
+    if (remoteId) {
+        // 10 damage per shot — server validates and clamps
+        sendHit(remoteId, 10);
+        const dir = pick.ray?.direction;
         if (dir) sendShoot(dir.x, dir.y, dir.z);
+        return;
     }
+
+    // Crate flash
+    if (meshName.startsWith("crate") && pick.pickedMesh.material) {
+        const mat  = pick.pickedMesh.material as StandardMaterial;
+        const orig = mat.diffuseColor.clone();
+        mat.diffuseColor = new Color3(1, 1, 1);
+        setTimeout(() => { mat.diffuseColor = orig; }, 100);
+    }
+
+    const dir = pick.ray?.direction;
+    if (dir) sendShoot(dir.x, dir.y, dir.z);
 }
