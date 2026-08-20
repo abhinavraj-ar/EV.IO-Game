@@ -553,7 +553,64 @@ body.is-mobile.landscape-small #action-buttons {
     #look-pad        { display: block; }
     #action-buttons  { display: flex; }
 }
+  
 
+/*Media mobile query*/
+@media (max-width: 768px) {
+    #health-container {
+        width: 180px;
+        height: 20px;
+        bottom: 20px;
+        left: 20px;
+    }
+
+    #mobile-controls {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        pointer-events: none;
+    }
+
+    #joystick-zone {
+        position: absolute;
+        left: 25px;
+        bottom: 30px;
+        width: 120px;
+        height: 120px;
+        pointer-events: auto;
+    }
+
+    #fire-button {
+        position: absolute;
+        right: 25px;
+        bottom: 60px;
+        width: 75px;
+        height: 75px;
+        border-radius: 50%;
+        pointer-events: auto;
+    }
+
+    #jump-button {
+        position: absolute;
+        right: 35px;
+        bottom: 150px;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        pointer-events: auto;
+    }
+}
+
+#mobile-controls {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    #mobile-controls {
+        display: block;
+    }
+}
 
 /* =========================================================
    MATCH RESULT SCREEN
