@@ -371,8 +371,14 @@ function spawnRemotePlayer(id: string, state: PlayerState) {
     // Hit capsule — create as a SIBLING of root (not child), so its position
     // is in world space and is not affected by root.scaling = charScale.
     const hitCapsule = MeshBuilder.CreateCapsule(`rp_body_${id}`, { height: 1.8, radius: 0.45 }, scene);
-    hitCapsule.isVisible  = false;
     hitCapsule.isPickable = true;
+    // IMPORTANT: use alpha=0 transparent material instead of isVisible=false.
+    // BabylonJS scene.pick() SKIPS meshes where isVisible=false even when
+    // isPickable=true, so the capsule would never be hit by raycasts.
+    const capsMat = new StandardMaterial(`rp_body_mat_${id}`, scene);
+    capsMat.alpha = 0;           // fully transparent — players can't see it
+    hitCapsule.material  = capsMat;
+    hitCapsule.isVisible = true; // must stay true so pick() includes it
     // Position is driven every frame in handlePlayerMoved via the root lerp;
     // set an initial world position here.
     hitCapsule.position.set(state.x, state.y, state.z);
@@ -486,11 +492,8 @@ function drawNameLabel(tex: DynamicTexture, name: string, color?: Color3) {
     tex.update();
 }
 
-/** Flash a mesh to white briefly to indicate a hit. */
-function flashMesh(mesh: Mesh) {
-    const mat = mesh.material as StandardMaterial;
-    if (!mat) return;
-    const original = mat.diffuseColor.clone();
-    mat.diffuseColor = new Color3(1, 1, 1);
-    setTimeout(() => { mat.diffuseColor = original; }, 100);
+/** No-op visual flash — capsule stays invisible, damage is handled server-side. */
+function flashMesh(_mesh: Mesh) {
+    // Intentionally empty: the hit capsule must remain alpha=0 (invisible).
+    // Damage feedback is shown via the health bar update from the server.
 }
