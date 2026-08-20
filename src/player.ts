@@ -385,32 +385,72 @@ export function setupPlayer(scene: Scene, canvas: HTMLCanvasElement) {
 // =============================================================================
 // RAYCAST SHOOTING
 // =============================================================================
+
+/**
+ * Custom pick predicate: include invisible meshes that are still flagged as
+ * pickable.  BabylonJS default pick SKIPS isVisible=false meshes even if
+ * isPickable=true — this is the root cause the hit capsules were never picked.
+ */
+function pickPredicate(mesh: { isEnabled: () => boolean; isPickable: boolean }): boolean {
+    return mesh.isEnabled() && mesh.isPickable;
+}
+
 function shoot(scene: Scene, canvas: HTMLCanvasElement) {
     gunFireSound.currentTime = 0;
     gunFireSound.play().catch(err => console.error("Gun sound:", err));
 
-    const pick = scene.pick(canvas.width / 2, canvas.height / 2);
-    if (!pick.hit || !pick.pickedMesh) return;
+    // scene.pick() expects CSS logical pixels (clientWidth/clientHeight).
+    // canvas.width/height is the GPU buffer size (can be 2× on HiDPI),
+    // which would fire the ray from the wrong position.
+    const cx = canvas.clientWidth  / 2;
+    const cy = canvas.clientHeight / 2;
 
-    const meshName = pick.pickedMesh.name;
-    console.log("Hit:", meshName);
+    // Pass the custom predicate so invisible hit-capsules are included.
+    const pick = scene.pick(cx, cy, pickPredicate as any);
 
-    // ── Hit a remote player ───────────────────────────────────────────────────
-    const remoteId = getRemotePlayerIdFromMesh(meshName);
-    if (remoteId) {
-        // 10 damage per shot — server validates and clamps
-        sendHit(remoteId, 10);
-        const dir = pick.ray?.direction;
-        if (dir) sendShoot(dir.x, dir.y, dir.z);
-        return;
+    console.log("[SHOOT] pick hit:", pick.hit, "mesh:", pick.pickedMesh?.name ?? "none");
+
+    // ── Primary pick: did we hit a remote player hit-capsule? ─────────────────
+    if (pick.hit && pick.pickedMesh) {
+        const remoteId = getRemotePlayerIdFromMesh(pick.pickedMesh.name);
+        if (remoteId) {
+            console.log("[SHOOT] Sending hit to:", remoteId);
+            sendHit(remoteId, 10);
+            const dir = pick.ray?.direction;
+            if (dir) sendShoot(dir.x, dir.y, dir.z);
+            return;
+        }
     }
 
-    // Crate flash
-    if (meshName.startsWith("crate") && pick.pickedMesh.material) {
-        const mat  = pick.pickedMesh.material as StandardMaterial;
-        const orig = mat.diffuseColor.clone();
-        mat.diffuseColor = new Color3(1, 1, 1);
-        setTimeout(() => { mat.diffuseColor = orig; }, 100);
+    // ── Fallback: multi-pick along the same ray ───────────────────────────────
+    // Catches cases where the primary pick stopped at a non-capsule mesh
+    // (environment geometry in front of the enemy).
+    if (pick.ray) {
+        const allHits = scene.multiPickWithRay(pick.ray, pickPredicate as any);
+        if (allHits && allHits.length > 0) {
+            for (const hit of allHits) {
+                if (!hit.pickedMesh) continue;
+                const remoteId = getRemotePlayerIdFromMesh(hit.pickedMesh.name);
+                if (remoteId) {
+                    console.log("[SHOOT] Hit via multi-pick:", hit.pickedMesh.name);
+                    sendHit(remoteId, 10);
+                    const dir = pick.ray.direction;
+                    sendShoot(dir.x, dir.y, dir.z);
+                    return;
+                }
+            }
+        }
+    }
+
+    // ── Crate flash (environment hit) ─────────────────────────────────────────
+    if (pick.hit && pick.pickedMesh) {
+        const meshName = pick.pickedMesh.name;
+        if (meshName.startsWith("crate") && pick.pickedMesh.material) {
+            const mat  = pick.pickedMesh.material as StandardMaterial;
+            const orig = mat.diffuseColor.clone();
+            mat.diffuseColor = new Color3(1, 1, 1);
+            setTimeout(() => { mat.diffuseColor = orig; }, 100);
+        }
     }
 
     const dir = pick.ray?.direction;
